@@ -1,0 +1,40 @@
+# Snakefile
+# Tells which files to generate as specified by the rule 'all'
+
+
+# Snakefile to quality check and estimate counts from RNA-Seq data on a reference genome (e.g. human genome hg19)
+# Tells which files to generate as specified by the rule 'all'
+
+
+##################
+## Desired outputs
+##################
+
+
+rule all:
+    input: 
+    message: "RNA-Seq pipeline has been successfully run"
+
+
+################################
+## Fastqc reports after trimming
+################################
+
+###########
+## Trimming
+###########
+
+
+#################################
+## Fastqc reports before trimming
+#################################
+rule fastqcForward_before_trimming:
+    input:
+        forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
+        reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
+    output:
+        forward = "./fastqc/{wildcards.sample}.forward",
+        reverse = "./fastqc/{wildcards.sample}"
+    params:
+        outdir = "./fastqc"
+      
