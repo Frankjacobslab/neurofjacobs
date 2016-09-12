@@ -10,25 +10,72 @@
 #########################
 configfile: "config.yaml"
 
+# Number of CPU (threads)
+THREADS = 8
+
+# Trimmomatic
+ADAPTERFILE = config["trimmomatic"]["adapters"]
+TRIMMOMATIC = config["trimmomatic"]["jarfile"]
+
 ##################
 ## Desired outputs
 ##################
-
+FASTQC_REPORTS = expand("fastqc/{trim}/{sample}_{orientation}/fastqc_data.txt",sample=config["samples"],orientation=["forward","reverse"],trim=["raw","trimmed"])
 
 rule all:
 	input:
-		expand("fastqc/{sample}_{orientation}/fastqc_data.txt",sample=config["samples"],orientation=["forward","reverse"])
+		FASTQC_REPORTS
 	message: "RNA-Seq pipeline has been successfully run"
 
 
 ################################
 ## Fastqc reports after trimming
 ################################
-
+rule fastqc_after_trimming:
+    input:
+        forward = "trimmed/{sample}_R1.fastq",
+        reverse = "trimmed/{sample}_R2.fastq"
+    output:
+        "fastqc/trimmed/{sample}_{orientation}/fastqc_data.txt"
+    message:"generating fastqc report for {wildcards.sample}"
+    shell:
+        "mkdir -p fastqc/;"
+        "fastqc --outdir=fastqc/{wildcards.sample}_forward/ {input.forward};"
+        "fastqc --outdir=fastqc/{wildcards.sample}_reverse/  {output.reverse};"
 ###########
 ## Trimming
 ###########
-
+rule trimmomaticPaired:
+    input:
+        ADAPTERFILE,
+        forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
+        reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
+    output:
+        forward = "trimmed/{sample}_R1.fastq",
+        reverse = "trimmed/{sample}_R2.fastq",
+        forwardUnpaired  = temp("trimmed/{sample}_R1_unpaired.fastq"),
+        reverseUnpaired = temp("trimmed/{sample}_R2_unpaired.fastq")
+    message:"Trimming {wildcards.sample} using Trimmomatic"
+    params :
+        seedMisMatches =            str(config['trimmomatic']['seedMisMatches']),
+        palindromeClipTreshold =    str(config['trimmomatic']['palindromeClipTreshold']),
+        simpleClipThreshhold =      str(config['trimmomatic']['simpleClipThreshold']),
+        LeadMinTrimQual =           str(config['trimmomatic']['LeadMinTrimQual']),
+        TrailMinTrimQual =          str(config['trimmomatic']['TrailMinTrimQual']),
+        windowSize =                str(config['trimmomatic']['windowSize']),
+        avgMinQual =                str(config['trimmomatic']['avgMinQual']),
+        minReadLen =                str(config['trimmomatic']['minReadLength']),
+        phred = 		    str(config["trimmomatic"]["phred"])
+    shell:
+        "java -jar {TRIMMOMATIC} PE {params.phred} -threads {THREADS} "
+        "{input.forward} {input.reverse} "
+        "{output.forward} {output.forwardUnpaired} "
+        "{output.reverse} {output.reverseUnpaired} "
+        "ILLUMINACLIP:{ADAPTERFILE}:{params.seedMisMatches}:{params.palindromeClipTreshold}:{params.simpleClipThreshhold} "
+        "LEADING:{params.LeadMinTrimQual} "
+        "TRAILING:{params.TrailMinTrimQual} "
+        "SLIDINGWINDOW:{params.windowSize}:{params.avgMinQual} "
+        "MINLEN:{params.minReadLen}"
 
 #################################
 ## Fastqc reports before trimming
@@ -38,14 +85,10 @@ rule fastqc_before_trimming:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        "fastqc/{sample}_{orientation}/fastqc_data.txt"
+        "fastqc/raw/{sample}_{orientation}/fastqc_data.txt"
     message:"generating fastqc report for {wildcards.sample}"
     shell:
         "mkdir -p fastqc/;"
         "fastqc --outdir=fastqc/{wildcards.sample}_forward/ {input.forward};"
         "fastqc --outdir=fastqc/{wildcards.sample}_reverse/  {output.reverse};"
-
-#	fastqc seqfile1 seqfile2 .. seqfileN#
-#
- #   fastqc [-o output dir] [--(no)extract] [-f fastq|bam|sam] 
- #          [-c contaminant file] seqfile1 .. seqfileN      
+  
