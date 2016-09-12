@@ -5,6 +5,10 @@
 # Snakefile to quality check and estimate counts from RNA-Seq data on a reference genome (e.g. human genome hg19)
 # Tells which files to generate as specified by the rule 'all'
 
+#########################
+## Pipeline configuration
+#########################
+configfile: "config.yaml"
 
 ##################
 ## Desired outputs
@@ -12,8 +16,9 @@
 
 
 rule all:
-    input: 
-    message: "RNA-Seq pipeline has been successfully run"
+	input:
+		expand("fastqc/{sample}_{orientation}/fastqc_data.txt",sample=config["samples"],orientation=["forward","reverse"])
+	message: "RNA-Seq pipeline has been successfully run"
 
 
 ################################
@@ -28,13 +33,19 @@ rule all:
 #################################
 ## Fastqc reports before trimming
 #################################
-rule fastqcForward_before_trimming:
+rule fastqc_before_trimming:
     input:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        forward = "./fastqc/{wildcards.sample}.forward",
-        reverse = "./fastqc/{wildcards.sample}"
-    params:
-        outdir = "./fastqc"
-      
+        "fastqc/{sample}_{orientation}/fastqc_data.txt"
+    message:"generating fastqc report for {wildcards.sample}"
+    shell:
+        "mkdir -p fastqc/;"
+        "fastqc --outdir=fastqc/{wildcards.sample}_forward/ {input.forward};"
+        "fastqc --outdir=fastqc/{wildcards.sample}_reverse/  {output.reverse};"
+
+#	fastqc seqfile1 seqfile2 .. seqfileN#
+#
+ #   fastqc [-o output dir] [--(no)extract] [-f fastq|bam|sam] 
+ #          [-c contaminant file] seqfile1 .. seqfileN      
