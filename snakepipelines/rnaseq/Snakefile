@@ -27,6 +27,10 @@ rule all:
 		FASTQC_REPORTS
 	message: "RNA-Seq pipeline has been successfully run"
 
+########################
+## version documentation
+########################
+
 
 ################################
 ## Fastqc reports after trimming
@@ -37,12 +41,15 @@ rule fastqc_after_trimming:
         reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R2.fastq"
     output:
         "fastqc/trimmed/{sample}_{orientation}/fastqc_data.txt"
-    message:"generating fastqc report for {wildcards.sample}"
-    shell:
-        "mkdir -p fastqc/{wildcards.sample}_forward/;"
-        "mkdir -p fastqc/{wildcards.sample}_reverse/;"
-        "fastqc --outdir=fastqc/{wildcards.sample}_forward/ {input.forward};"
-        "fastqc --outdir=fastqc/{wildcards.sample}_reverse/  {output.reverse};"
+    message:"generating fastqc report for trimmed forward and reverse {wildcards.sample} reads"
+    params:
+        forward = "fastqc/trimmed/{wildcards.sample}_forward/",
+        reverse = "fastqc/trimmed/{wildcards.sample}_reverse/"
+    run:
+        # keep the shell() command as fastqc does not support line return
+        shell("fastqc --outdir={params.forward} {input.forward}") 
+        shell("fastqc --outdir={params.reverse} {output.reverse}")
+
 ###########
 ## Trimming
 ###########
@@ -88,10 +95,12 @@ rule fastqc_before_trimming:
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
         "fastqc/raw/{sample}_{orientation}/fastqc_data.txt"
-    message:"generating fastqc report for {wildcards.sample}"
-    shell:
-        "mkdir -p fastqc/{wildcards.sample}_forward/;"
-        "mkdir -p fastqc/{wildcards.sample}_reverse/;"
-        "fastqc --outdir=fastqc/{wildcards.sample}_forward/ {input.forward};"
-        "fastqc --outdir=fastqc/{wildcards.sample}_reverse/  {output.reverse};"
+    message:"generating fastqc report for original forward and reverse {wildcards.sample} reads"
+    params:
+        forward = "fastqc/raw/{sample}_forward/",
+        reverse = "fastqc/raw/{sample}_reverse/"
+    run:
+        # keep the shell() command as fastqc does not support line return
+        shell("fastqc -o={params.forward} {input.forward}")
+        shell("fastqc --outdir={params.reverse} {output.reverse}")
   
