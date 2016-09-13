@@ -11,7 +11,7 @@
 configfile: "config.yaml"
 
 # Number of CPU (threads)
-THREADS = 8
+THREADS = 1
 
 # Trimmomatic
 ADAPTERFILE = config["trimmomatic"]["adapters"]
@@ -33,8 +33,8 @@ rule all:
 ################################
 rule fastqc_after_trimming:
     input:
-        forward = "trimmed/{sample}_R1.fastq",
-        reverse = "trimmed/{sample}_R2.fastq"
+        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R1.fastq",
+        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R2.fastq"
     output:
         "fastqc/trimmed/{sample}_{orientation}/fastqc_data.txt"
     message:"generating fastqc report for {wildcards.sample}"
@@ -51,10 +51,10 @@ rule trimmomaticPaired:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        forward = "trimmed/{sample}_R1.fastq",
-        reverse = "trimmed/{sample}_R2.fastq",
-        forwardUnpaired  = temp("trimmed/{sample}_R1_unpaired.fastq"),
-        reverseUnpaired = temp("trimmed/{sample}_R2_unpaired.fastq")
+        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R1.fastq",
+        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R2.fastq",
+        forwardUnpaired  = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R1_unpaired.fastq"),
+        reverseUnpaired = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R2_unpaired.fastq")
     message:"Trimming {wildcards.sample} using Trimmomatic"
     params :
         seedMisMatches =            str(config['trimmomatic']['seedMisMatches']),
