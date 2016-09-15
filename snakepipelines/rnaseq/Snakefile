@@ -20,7 +20,8 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 ##################
 ## Desired outputs
 ##################
-FASTQC_REPORTS = expand("fastqc/{trim}/{sample}_{orientation}/fastqc_data.txt",sample=config["samples"],orientation=["forward","reverse"],trim=["raw","trimmed"])
+FASTQC_REPORTS = expand("fastqc/trimmed/{sample}_{orientation}/fastqc_data.txt",sample=config["samples"],orientation=["forward","reverse"])
+
 
 rule all:
 	input:
@@ -47,8 +48,8 @@ rule fastqc_after_trimming:
         reverse = "fastqc/trimmed/{wildcards.sample}_reverse/"
     run:
         # keep the shell() command as fastqc does not support line return
-        shell("fastqc --outdir={params.forward} {input.forward}") 
-        shell("fastqc --outdir={params.reverse} {output.reverse}")
+        shell("fastqc --threads {THREADS} --outdir={params.forward} {input.forward}") 
+        shell("fastqc --threads {THREADS} --outdir={params.reverse} {output.reverse}")
 
 ###########
 ## Trimming
@@ -61,8 +62,8 @@ rule trimmomaticPaired:
     output:
         forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R1.fastq",
         reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R2.fastq",
-        forwardUnpaired  = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R1_unpaired.fastq"),
-        reverseUnpaired = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R2_unpaired.fastq"),
+        forwardUnpaired  = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R1_unpaired.fastq",
+        reverseUnpaired = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_R2_unpaired.fastq",
         log = "results/trimlogs/{sample}.txt"
     message:"Trimming {wildcards.sample} using Trimmomatic"
     params :
@@ -76,7 +77,7 @@ rule trimmomaticPaired:
         minReadLen =                str(config['trimmomatic']['minReadLength']),
         phred = 		    str(config["trimmomatic"]["phred"])
     shell:
-        "java -jar {TRIMMOMATIC} PE {params.phred} -threads {THREADS} -trimlog {output.log}"
+        "java -jar {TRIMMOMATIC} PE {params.phred} -threads {THREADS} "
         "{input.forward} {input.reverse} "
         "{output.forward} {output.forwardUnpaired} "
         "{output.reverse} {output.reverseUnpaired} "
@@ -86,21 +87,3 @@ rule trimmomaticPaired:
         "SLIDINGWINDOW:{params.windowSize}:{params.avgMinQual} "
         "MINLEN:{params.minReadLen}"
 
-#################################
-## Fastqc reports before trimming
-#################################
-rule fastqc_before_trimming:
-    input:
-        forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
-        reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
-    output:
-        "fastqc/raw/{sample}_{orientation}/fastqc_data.txt"
-    message:"generating fastqc report for original forward and reverse {wildcards.sample} reads"
-    params:
-        forward = "fastqc/raw/{sample}_forward/",
-        reverse = "fastqc/raw/{sample}_reverse/"
-    run:
-        # keep the shell() command as fastqc does not support line return
-        shell("fastqc -o={params.forward} {input.forward}")
-        shell("fastqc --outdir={params.reverse} {output.reverse}")
-  
