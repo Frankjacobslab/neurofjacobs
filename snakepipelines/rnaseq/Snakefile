@@ -14,7 +14,7 @@ import os
 configfile: "config.yaml"
 
 # Number of CPU (threads)
-THREADS = 1
+THREADS = config["threads"]
 
 # Trimmomatic
 ADAPTERFILE = config["trimmomatic"]["adapters"]
@@ -24,12 +24,13 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 ## Desired outputs
 ##################
 FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
-
 STAR2PASS = "./star2pass/chrLength.txt"
+GENECOUNTS = "results/gene_counts.txt"
 
 rule all:
 	input:
-		STAR2PASS
+		STAR2PASS,
+		GENECOUNTS
 	message: "RNA-Seq pipeline has been successfully run"
 
 ########################
@@ -38,8 +39,67 @@ rule all:
 
 
 
+
+
+
+################################################
+## Count read alignments per feature (e.g. gene)
+################################################
+rule feature_counts:
+    input:
+        bams = expand("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam",sample=config["samples"].keys()),
+        gtf = config["annotations"]["gtf4genes"],
+        genome = config["refseqs"]["genomefasta"]
+    output:
+        "results/gene_counts.txt"
+    message:"summarizing counts using Feature Counts and {input.gtf}"
+    shell:
+        "featureCounts "
+        "-t exon "		# specify how to count reads at feature level (e.g. exon)
+        "-g gene_id " 		# specify how to count reads at meta-feature level (e.g. gene)
+        "-T {THREADS} "
+        "-G {input.genome} "	# ref genome sequence
+        "-a {input.gtf}"	# annotation 
+        "-o {output} "
+        "{input}"               # can process more than one BAM file at once 
+        
+
+#############################
+# Genome alignment using STAR
+#############################
+rule map_to_genome_using_STAR:
+    input:
+        ref = "./star2pass/",
+        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq",
+        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq"
+    output:
+        temp("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam"),
+        temp("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam.bai"),
+        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Log.final.out",
+        temp("mapped/{sample}_Unmapped.out.mate1"), 
+        temp("mapped/{sample}_Unmapped.out.mate2")
+    message:"mapping the {wildcards.sample} reads to genome"
+    params:
+        prefix = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_",
+        maxmismatches = config["star"]["mismatches"],
+        unmapped = config["star"]["unmapped"]	,
+        multimappers = config["star"]["multimappers"],
+        matchNminoverLread = config["star"]["matchminoverlengthread"] 	
+    shell:
+            "STAR --genomeDir {input.ref} "
+            "--readFilesIn {input.forward} {input.reverse} "
+            "--outFilterMultimapNmax {params.multimappers} "
+            "--outFilterMismatchNmax {params.maxmismatches} "
+            "--outFilterMatchNminOverLread {params.matchNminoverLread} "
+            "--alignEndsType EndToEnd "
+            "--runThreadN {THREADS} "
+            "--outReadsUnmapped {params.unmapped} "
+            "--outFileNamePrefix {params.prefix} "
+            "--outSAMtype BAM SortedByCoordinate;"
+            "samtools index {output[0]}"
+
 #####################################################################
-## STAR 2-pass (genome indexing, splice junctions database generation 
+## STAR 2-pass: genome indexing + splice junctions database generation 
 #####################################################################
 rule star2pass_index:
     input:
@@ -79,7 +139,8 @@ rule star1pass_align:
         reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq", 
         ref = "star_index/"
     output:
-        "./star1pass/{sample}_SJ.out.tab"
+        "./star1pass/{sample}_SJ.out.tab",
+        temp("./star1pass/{sample}_Aligned.out.sam")
     message:"STAR 1st pass: aligning {wildcards.sample} reads to generate splice junction files"
     params:"./star1pass/{sample}_"	
     shell: 		
