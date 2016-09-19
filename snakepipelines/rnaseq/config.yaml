@@ -1,4 +1,5 @@
 ---
+threads: 10
 fastqdir: "/home/mgalland/workspace/neurofjacobs/data/01.seqruns/20160912_dopamine_spheres/"
 samples:
   mDA_D0_1:
@@ -39,4 +40,22 @@ trimmomatic:
   windowSize: '4'
   avgMinQual: '15'
   minReadLength: '40'
+  # phred for illumina >1.8 the quality score are encoded by phred33
   phred: "-phred33"
+fastqc:
+  executable: '../../scr/FastQC/fastqc'
+refseqs:
+  genomelink: 'http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.2bit'
+  genomefasta: '../../data/02.refs/hg19.genome.fa'
+annotations:
+  gtf4genes: '../../data/02.refs/knownGenes.gtf'
+  gtf4repeats: '../../data/02.refs/repeats.gtf'
+star:
+  # alignment will be output only if it has less mismatches than this number
+  mismatches: '2'
+  # unmapped accepted values are None or Fastx (to output fastq files of unmapped reads)
+  unmapped: 'None' 
+  # maximum number of loci the read is allowed to map to
+  multimappers: '1'
+  # alignment will be output if percentage of read length is higher than this value (66% of 2x100bp = 132 nucleotides)
+  matchminoverlengthread: '0.66'
