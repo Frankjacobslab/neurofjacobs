@@ -52,14 +52,14 @@ rule feature_counts:
         genome = config["refseqs"]["genomefasta"]
     output:
         "results/gene_counts.txt"
-    message:"summarizing counts using Feature Counts and {input.gtf}"
+    message:"summarizing read counts"
     shell:
         "featureCounts "
         "-t exon "		# specify how to count reads at feature level (e.g. exon)
         "-g gene_id " 		# specify how to count reads at meta-feature level (e.g. gene)
         "-T {THREADS} "
         "-G {input.genome} "	# ref genome sequence
-        "-a {input.gtf}"	# annotation 
+        "-a {input.gtf} "	# annotation 
         "-o {output} "
         "{input}"               # can process more than one BAM file at once 
         
@@ -75,9 +75,7 @@ rule map_to_genome_using_STAR:
     output:
         temp("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam"),
         temp("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam.bai"),
-        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Log.final.out",
-        temp("mapped/{sample}_Unmapped.out.mate1"), 
-        temp("mapped/{sample}_Unmapped.out.mate2")
+        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Log.final.out"
     message:"mapping the {wildcards.sample} reads to genome"
     params:
         prefix = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_",
