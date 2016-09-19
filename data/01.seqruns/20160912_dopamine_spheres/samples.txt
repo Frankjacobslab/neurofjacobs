@@ -1,0 +1,24 @@
+#RNAseq data of human midbrain dopamine spheres comparing three different time points during differentiation, three biological replicates of 
+#each time point: 
+#D0=hESCs (different RNAseq run, downloaded from UCSC browser) 
+#D28
+#D42
+huESC_fj74_R1.fastq.gz = mDA_D0_1
+huESC_fj74_R2.fastq.gz = mDA_D0_1
+fj95_TGACCA_R1.fastq.gz = mDA_D0_2
+fj95_TGACCA_R2.fastq.gz = mDA_D0_2
+fj96_ACAGTG_R1.fastq.gz = mDA_D0_3
+fj96_ACAGTG_R2.fastq.gz = mDA_D0_3
+C9JBWANXX_102867-001-001_GTCCTAAG_L008_R1.fastq.gz = mDA_D28_1
+C9JBWANXX_102867-001-001_GTCCTAAG_L008_R2.fastq.gz = mDA_D28_1
+C9JBWANXX_102867-001-002_GCGTTAGA_L008_R1.fastq.gz = mDA_D28_2
+C9JBWANXX_102867-001-002_GCGTTAGA_L008_R2.fastq.gz = mDA_D28_2
+C9JBWANXX_102867-001-003_CAAGGTAC_L008_R1.fastq.gz = mDA_D28_3
+C9JBWANXX_102867-001-003_CAAGGTAC_L008_R2.fastq.gz = mDA_D28_3
+C9JBWANXX_102867-001-004_AGACCTTG_L008_R1.fastq.gz = mDA_D42_1
+C9JBWANXX_102867-001-004_AGACCTTG_L008_R2.fastq.gz = mDA_D42_1
+C9JBWANXX_102867-001-005_GTCGTTAC_L008_R1.fastq.gz = mDA_D42_2
+C9JBWANXX_102867-001-005_GTCGTTAC_L008_R2.fastq.gz = mDA_D42_2
+C9JBWANXX_102867-001-006_GTAACCGA_L008_R1.fastq.gz = mDA_D42_3
+C9JBWANXX_102867-001-006_GTAACCGA_L008_R2.fastq.gz = mDA_D42_3
+
