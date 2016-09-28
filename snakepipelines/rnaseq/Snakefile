@@ -26,21 +26,26 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
 STAR2PASS = "./star2pass/chrLength.txt"
 GENECOUNTS = "results/gene_counts.txt"
+MASTER_FILES = ["results/Snakefile","results/config.yaml"]
 
 rule all:
 	input:
 		STAR2PASS,
-		GENECOUNTS
+		GENECOUNTS,
+		MASTER_FILES 
 	message: "RNA-Seq pipeline has been successfully run"
 
-########################
-## version documentation
-########################
-
-
-
-
-
+##############################################
+## version documentation and copy master files
+##############################################
+rule copy_master_files:
+    output:
+        "results/Snakefile",
+        "results/config.yaml"
+    message:"copying master files (Snakefile and configuration files)"
+    shell:
+        "cp Snakefile results/;"
+        "cp config.yaml results/"
 
 ################################################
 ## Count read alignments per feature (e.g. gene)
@@ -48,20 +53,21 @@ rule all:
 rule feature_counts:
     input:
         bams = expand("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam",sample=config["samples"].keys()),
-        gtf = config["annotations"]["gtf4genes"],
+        annotation = config["annotations"]["refseqFromSubread"],
         genome = config["refseqs"]["genomefasta"]
     output:
         "results/gene_counts.txt"
     message:"summarizing read counts"
     shell:
         "featureCounts "
-        "-t exon "		# specify how to count reads at feature level (e.g. exon)
-        "-g gene_id " 		# specify how to count reads at meta-feature level (e.g. gene)
+        "-t exon "			# specify how to count reads at feature level (e.g. exon)
+        "-g gene_id " 			# specify how to count reads at meta-feature level (e.g. gene)
         "-T {THREADS} "
-        "-G {input.genome} "	# ref genome sequence
-        "-a {input.gtf} "	# annotation 
+        "-G {input.genome} "		# ref genome sequence
+        "-a {input.annotation} "	# annotation 
+        "-F SAF "			# SAF or GTF (by default GTF)
         "-o {output} "
-        "{input}"               # can process more than one BAM file at once 
+        "{input}"               	# can process more than one BAM file at once 
         
 
 #############################
@@ -189,12 +195,12 @@ rule trimmomaticPaired:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq",
-        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq",
+        forward = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq"),
+        reverse = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq"),
         forwardUnpaired  = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward_unpaired.fastq",
         reverseUnpaired = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse_unpaired.fastq",
     message:"Trimming {wildcards.sample} using Trimmomatic"
-    log:"results/trimlogs/{wildcards.sample}_{wildcards.pair}.trimlog"
+    log:"results/trimlogs/{sample}_{pair}.trimlog"
     params :
         seedMisMatches =            str(config['trimmomatic']['seedMisMatches']),
         palindromeClipTreshold =    str(config['trimmomatic']['palindromeClipTreshold']),
@@ -214,5 +220,5 @@ rule trimmomaticPaired:
         "LEADING:{params.LeadMinTrimQual} "
         "TRAILING:{params.TrailMinTrimQual} "
         "SLIDINGWINDOW:{params.windowSize}:{params.avgMinQual} "
-        "MINLEN:{params.minReadLen}"
+        "MINLEN:{params.minReadLen} 2>{log}"
 
