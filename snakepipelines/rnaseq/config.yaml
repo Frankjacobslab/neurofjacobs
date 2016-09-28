@@ -50,12 +50,13 @@ refseqs:
 annotations:
   gtf4genes: '../../data/02.refs/knownGenes.gtf'
   gtf4repeats: '../../data/02.refs/repeats.gtf'
+  refseqFromSubread: '../../data/02.refs/hg19_RefSeq_exon.txt'
 star:
   # alignment will be output only if it has less mismatches than this number
   mismatches: '2'
   # unmapped accepted values are None or Fastx (to output fastq files of unmapped reads)
   unmapped: 'None' 
   # maximum number of loci the read is allowed to map to
-  multimappers: '1'
+  multimappers: '10'
   # alignment will be output if percentage of read length is higher than this value (66% of 2x100bp = 132 nucleotides)
   matchminoverlengthread: '0.66'
