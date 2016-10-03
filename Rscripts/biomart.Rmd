@@ -4,7 +4,6 @@ author: "Marc Galland"
 date: "21 septembre 2016"
 output: html_document
 ---
-
 BiomaRt is a R package to retrieve data from BioMart databases.
 From the documentation: 
 > It enables to retrieve large amounts of data in a uniform way without the need to know the underlying database schemas or write complex SQL queries. Some BioMart databases are Ensembl, Uniprot and HapMap. 
