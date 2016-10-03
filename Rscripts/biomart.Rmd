@@ -1,0 +1,53 @@
+---
+title: "Biomart"
+author: "Marc Galland"
+date: "21 septembre 2016"
+output: html_document
+---
+
+BiomaRt is a R package to retrieve data from BioMart databases.
+From the documentation: 
+> It enables to retrieve large amounts of data in a uniform way without the need to know the underlying database schemas or write complex SQL queries. Some BioMart databases are Ensembl, Uniprot and HapMap. 
+
+```{r}
+library(biomaRt)
+```
+
+# Biomart
+
+## connect to a BioMart database and list available datasets
+It first extract a database ("Mart") for *homo sapiens*
+```{r}
+# get human Mart 
+humanMart = useMart("ensembl",dataset = "hsapiens_gene_ensembl")
+```
+
+## Query selected biomart database
+__Filters__: restriction on the datasets. Filters (one or more) that should be used in the query. To see all possible filters, type `View(filters)`
+__Attributes__: values we want to retrieve. Attributes you want to retrieve. To see all possible attributes, type `View(attributes)`
+```{r BiomaRt query}
+# All possible filters
+filters = humanMart@filters
+
+# All possible atttributes
+attributes = humanMart@attributes
+
+# # build the query for a specific gene
+# humanTrans = getBM(
+#   # values we want to retrieve
+#   attributes = c('entrezgene','hgnc_symbol','ensembl_gene_id','affy_hugene_1_0_st_v1'),
+#   
+#   # filters define a restriction on the datasets
+#   filters = 'hgnc_symbol', 
+#   values = 'TH',
+#   mart = humanMart)
+
+# to retrieve all the genes
+humanGenes = getBM(
+  # values we want to retrieve
+  attributes = c('entrezgene','hgnc_symbol','affy_hugene_1_0_st_v1'),
+  mart = humanMart)
+
+# write table
+write.table(humanGenes,file = "../data/02.refs/humanGenes.txt",sep="\t",row.names = F,quote = F)
+```
