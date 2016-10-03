@@ -22,15 +22,9 @@ The __counts__ file must have the following structure:
  100507658 | 0        | 0        | 0        | 1         | 0         | 0         | 0         | 0         | 2         
  100132287 | 2        | 8        | 12       | 557       | 188       | 138       | 170       | 168       | 240       
 
- Geneid    | mDA_D0_2 | mDA_D0_3 | mDA_D0_1 | mDA_D28_3 | mDA_D28_2 | mDA_D28_1 | mDA_D42_1 | mDA_D42_2 | mDA_D42_3 
------------|----------|----------|----------|-----------|-----------|-----------|-----------|-----------|-----------
- 653635    | 97       | 84       | 71       | 1960      | 840       | 765       | 822       | 891       | 1157      
- 100422834 | 0        | 0        | 0        | 0         | 0         | 0         | 0         | 0         | 0         
-
-
 The __design__ file must have the following structure:
 
- sample    | condition | libType    
+ sample    | condition | library    
 -----------|-----------|------------
  mDA_D0_2  | D0        | paired-end 
  mDA_D0_3  | D0        | paired-end 
