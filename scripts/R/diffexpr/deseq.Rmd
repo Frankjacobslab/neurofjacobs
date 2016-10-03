@@ -1,0 +1,21 @@
+---
+title: "Differential expression using DESeq2"
+author: "Marc Galland"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+        number_sections: yes
+        toc: yes
+        toc_depth: 2  
+---
+# introduction
+DESeq2 performs a differential expression analysis at the gene level using __raw counts__ from RNA-Seq reads aligned to a reference sequence (genome in most cases) and a __experimental design__ file that lists factors of interest. 
+
+It uses the negative binomial distribution
+
+## Original paper and further reading
+*  Please cite Anders & Huber [original paper](https://www.ncbi.nlm.nih.gov/pubmed/20979621)
+*  A detailed protocol for RNA-Seq based differential expression can be found [here](https://www.ncbi.nlm.nih.gov/pubmed/23975260)
+
+
+
