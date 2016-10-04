@@ -92,21 +92,19 @@ plotPCA(rld, intgroup = c("condition"))
 # extract values for clustering...
 rlog_values = assay(rld)
 
-# heatmap and clustering of all genes (takes a lot of time)
-#pheatmap(rlog_values)
-
 # sample to sample clustering
-sampleDists <- dist(t(assay(rld)))
+sampleDists <- dist(t(assay(rld)),method = "euclidean")
 sampleDistMatrix <- as.matrix(sampleDists)
 rownames(sampleDistMatrix) <- rld$condition
 colnames(sampleDistMatrix) <- NULL
   
-# heatmap
+# heatmap 
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
 pheatmap(sampleDistMatrix,
-clustering_distance_rows=sampleDists,
-clustering_distance_cols=sampleDists,
-col=colors)
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors,
+         legend = T)
 ```
 
 ## Differential analysis 
@@ -121,37 +119,33 @@ test = nbinomWaldTest(cds)
 res_D0vsD28 = results(test,contrast = c("condition","D0","D28"))
 res_D0vsD42 = results(test,contrast = c("condition","D0","D42"))
 
-
-# cds_wald = DESeq(cds,
-#             test = "Wald", 
-#             fitType = c("parametric"),
-#             full = design(cds),
-#             quiet = FALSE,
-#             minReplicatesForReplace = 7,
-#             # expanded includes an indicator variable for each level of factors
-#             modelMatrixType = "expanded", 
-#             parallel = FALSE,
-#             BPPARAM = bpparam()
-# )
-
 # extract results
-resD0vsD28 = results(cds_wald,contrast = c("condition","D0","D28"),test = "Wald")
-resD0vsD42= results(cds_wald,contrast = c("condition","D0","D28"),test="Wald")
-```
-
-### Likelihood test
-```{r}
-# Likelihood test ratio `LRT`
-cds_lrt = DESeq(cds,test = "LRT",reduced= ~ 1,quiet = F)
-
-# extract results
-res_lrt = results(cds_lrt)
-resOrdered <- res_lrt[order(res_lrt$padj),]
-
-# write to table
 write.table(as.data.frame(resOrdered),file="diff_expr_LRT.txt",quote = F,row.names = T ,sep = "\t")
 ```
 
+### Likelihood test
+To extract results, you need the `results` function that requires a contrast to extract comparisons.
+> The `contrast` argument takes a character vector with exactly three elements: the name of a factor in the design formula, the name of the numerator level for the fold change, and the name of the denominator level for the fold change (simplest case) 
+
+```{r}
+# Likelihood test ratio `LRT`
+cds_lrt = nbinomLRT(cds,full = design(cds),reduced= ~ 1,quiet = F)
+
+# extract results
+# contrast: factor / numerator for fold change / denominator for fold change
+res_lrt_D28vsD0 = results(cds_lrt,contrast = c("condition","D28","D0"))
+res_lrt_D42vs28 = results(cds_lrt,contrast = c("condition","D42","D28"))
+
+res_lrt_D28vsD0 <- res_lrt_D28vsD0[order(res_lrt_D28vsD0$padj),]
+res_lrt_D42vsD28 <- res_lrt_D28vsD0[order(res_lrt_D28vsD0$padj),]
+
+# write to table
+write.table(as.data.frame(res_lrt_D28vsD0),file="diff_lrt_D28vsD0.txt",quote = F,row.names = T ,sep = "\t")
+write.table(as.data.frame(res_lrt_D42vsD28),file="diff_lrt_D42vsD28.txt",quote = F,row.names = T ,sep = "\t")
+```
+
+__Value__: 
+> It outputs a DESeqResults object, which is a simple subclass of DataFrame. This object contains the results columns: baseMean, log2FoldChange, lfcSE, stat, pvalue and padj, and also includes metadata columns of variable information. The lfcSE gives the standard error of the log2FoldChange. For the Wald test, stat is the Wald statistic: the log2FoldChange divided by lfcSE, which is compared to a standard Normal distribution to generate a two-tailed pvalue. __For the likelihood ratio test (LRT), stat is the difference in deviance between the reduced model and the full model, which is compared to a chi-squared distribution to generate a pvalue__.For resultsNames: the names of the columns available as results, usually a combination of the variable name and a levelFor removeResults: the original DESeqDataSet with results metadata columns removed 
  
 # session info 
 Records package versions, R version...
