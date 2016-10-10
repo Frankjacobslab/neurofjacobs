@@ -5,6 +5,7 @@
 # Tells which files to generate as specified by the rule 'all'
 
 import os
+from subprocess import check_output
 
 #########################
 ## Pipeline configuration
@@ -26,6 +27,7 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
 STAR2PASS = "./star2pass/chrLength.txt"
 GENECOUNTS = "results/gene_counts.txt"
+BIGWIGS = expand("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}.plus.normalized.bigWig",sample=config["samples"])
 MASTER_FILES = ["results/Snakefile","results/config.yaml"]
 
 rule all:
@@ -46,6 +48,34 @@ rule copy_master_files:
     shell:
         "cp Snakefile results/;"
         "cp config.yaml results/"
+
+######################################################
+## generate scaled bigWig files for visualization@UCSC
+######################################################
+rule convert_to_bigWig: 
+    input:
+        bedgraph = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}.plus.normalized.bg",
+        chroms = config["refseqs"]["chromSizes"]
+    output:
+        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}.plus.normalized.bigWig"
+    message:"converting {input} to bigWig format"
+    shell:"bedGraphToBigWig {input.bedgraph} {input.chroms} {output}" 
+
+rule generate_scaled_bedgraph_strand:
+    input:
+        bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam",
+        chroms = config["refseqs"]["chromSizes"]
+    output:
+        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}.plus.normalized.bg"
+    message:"generating scaled bedgraph file for {wildcards.sample}"
+    run:
+        # count number of mapped reads (for bedgraph scaling) + keep number
+        scaling_factor = subprocess.check_output("samtools view -F 0x4 {input.bam} | cut -f 1 | sort | uniq | wc -l",shell=True)
+        scaling_factor = scaling_factor.strip().decode()
+        # create a bedgraph file
+        shell("bedtools genomecov -ibam {input.bam} -bg -scale " + str(scaling_factor) + " -g {input.chroms} -strand + -trackopts 'type=bedGraph name={wildcards.sample}' > {output}") 
+
+#track type=bigWig name="My Big Wig" description="A Graph of Data from My Lab" bigDataUrl=http://myorg.edu/mylab/myBigWig.bw 
 
 ################################################
 ## Count read alignments per feature (e.g. gene)
@@ -200,7 +230,7 @@ rule trimmomaticPaired:
         forwardUnpaired  = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward_unpaired.fastq",
         reverseUnpaired = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse_unpaired.fastq",
     message:"Trimming {wildcards.sample} using Trimmomatic"
-    log:"results/trimlogs/{sample}_{pair}.trimlog"
+    log:"results/trimlogs/{sample}.trimlog"
     params :
         seedMisMatches =            str(config['trimmomatic']['seedMisMatches']),
         palindromeClipTreshold =    str(config['trimmomatic']['palindromeClipTreshold']),
@@ -221,4 +251,3 @@ rule trimmomaticPaired:
         "TRAILING:{params.TrailMinTrimQual} "
         "SLIDINGWINDOW:{params.windowSize}:{params.avgMinQual} "
         "MINLEN:{params.minReadLen} 2>{log}"
-
