@@ -32,7 +32,9 @@ This package contains the `featureCounts` program used to compute read counts fo
 >gene to form a set of disjoint exons for each gene. Genes with the same Entrez gene identiers were also merged into one gene.
 >Each row in the annotation represents an exon of a gene. There are ve columns in the annotation data including Entrez gene identier (GeneID), chromosomal name (Chr),
 chromosomal start position(Start), chromosomal end position (End) and strand (Strand). 
+
 ### bedGraphToBigWig
+From the UCSC softwares. Used to convert bedGraph files into bigWig files. 
 
 ## Snakepipelines
 Analysis pipelines built using Snakemake to output desired results (rna-seq counts, etc.)
