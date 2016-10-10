@@ -24,6 +24,7 @@ The sample to fastq files correspondence can be found in the 'data/01.seqruns/20
 In this folder you will various softwares that were used for the analysis (e.g. twoBitToFa to convert hg19.2bit to fasta format)
 *  To use a software, first download it or use the version in this project repository `scr/`
 *  Then type in `nano ~/.bash_profile` and write `export PATH=$PATH:[/yourpathto/scr/]` to edit your $PATH variable so that it contains the path to the software. Save the `bash_profile` file (Ctrl+X) and restart a bash session and type the name of the program e.g. `twoBitToFa` to see if you can access it.
+
 ### subread
 This package contains the `featureCounts` program used to compute read counts for selected level (counts at gene level). In the same folder, one can also find reference annotation (including the hg19 genome sequence) reformated specifically for featureCounts. 
 >From the _subread_ documentation:
