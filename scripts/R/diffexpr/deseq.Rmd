@@ -115,10 +115,10 @@ This function performs a default differential expression analysis through the st
 ### Binomial test
 ```{r}
 # # Performs a differential analysis on raw counts using Wald test 
-# test = nbinomWaldTest(cds)
-# res_D0vsD28 = results(test,contrast = c("condition","D0","D28"))
-# res_D0vsD42 = results(test,contrast = c("condition","D0","D42"))
-# 
+#cds_wald = nbinomWaldTest(cds)
+#res_D0vsD28 = results(test,contrast = c("condition","D0","D28"))
+#res_D0vsD42 = results(test,contrast = c("condition","D0","D42"))
+
 # # extract results
 # write.table(as.data.frame(resOrdered),file="diff_expr_LRT.txt",quote = F,row.names = T ,sep = "\t")
 ```
@@ -133,18 +133,21 @@ cds_lrt = nbinomLRT(cds,full = design(cds),reduced= ~ 1,quiet = F)
 
 # extract results
 # contrast: factor / numerator for fold change / denominator for fold change
-res_lrt_D28vsD0 = results(cds_lrt,contrast = c("condition","D28","D0"))
-res_lrt_D42vsD28 = results(cds_lrt,contrast = c("condition","D42","D28"))
-
-res_lrt_D28vsD0 <- res_lrt_D28vsD0[order(res_lrt_D28vsD0$padj),]
-res_lrt_D42vsD28 <- res_lrt_D28vsD0[order(res_lrt_D42vsD28$padj),]
+D28_vs_D0 = results(cds_lrt,contrast = c("condition","D28","D0"))
+D42_vs_D28 = results(cds_lrt,contrast = c("condition","D42","D28"))
 
 # log2 fold change done "manually"
 #head(DESeq2::counts(cds,normalized=T))
 
+# convert to normal dataframe
+D28_vs_D0 = as.data.frame(D28_vs_D0)
+D42_vs_D28 = as.data.frame(D42_vs_D28)
+D28_vs_D0$gene = row.names(D28_vs_D0)
+D42_vs_D28$gene = row.names(D42_vs_D28)
+
 # write to table
-write.table(as.data.frame(res_lrt_D28vsD0),file="diff_lrt_D28vsD0.txt",quote = F,row.names = T ,sep = "\t")
-write.table(as.data.frame(res_lrt_D42vsD28),file="diff_lrt_D42vsD28.txt",quote = F,row.names = T ,sep = "\t")
+write.table(D28_vs_D0,file="diff_lrt_D28vsD0.txt",quote = F,row.names = F ,sep = "\t")
+write.table(D42_vs_D28,file="diff_lrt_D42vsD28.txt",quote = F,row.names = F ,sep = "\t")
 ```
 
 __Value__: 
