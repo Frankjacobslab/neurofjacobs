@@ -5,6 +5,7 @@
 # Tells which files to generate as specified by the rule 'all'
 
 import os
+import subprocess
 
 #########################
 ## Pipeline configuration
@@ -32,7 +33,7 @@ MASTER_FILES = ["results/Snakefile","results/config.yaml"]
 rule all:
 	input:
 		STAR2PASS,
-		GENECOUNTS,
+		#GENECOUNTS,
 		BIGWIG,
 		MASTER_FILES 
 	message: "RNA-Seq pipeline has been successfully run"
@@ -49,11 +50,9 @@ rule copy_master_files:
         "cp Snakefile results/;"
         "cp config.yaml results/"
 
-
 #########
 ## bigWig
 #########
-
 rule convert_to_bigWig: 
     input:
         bedgraph = "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.sorted.bg",
@@ -68,7 +67,7 @@ rule sort_bedgraph:
     input:
         "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.bg"
     output:
-        temp("/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.sorted.bg")
+        "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.sorted.bg"
     message:"sorting {wildcards.sample} bedGraph file for strand {wildcards.strand}"
     shell:
         "bedSort {input} {output}"      
@@ -81,26 +80,55 @@ rule generate_chrom_sizes:
     message:"generating chromosome sizes"
     shell:"twoBitInfo {input} {output}"
 
+#rule generate_scaled_bedgraph_strand:
+ #   input:
+  #      bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam",
+   #     chroms = "chromSizes.tab"
+   # output:
+    #    plus = "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.pos.normalized.bg",
+     #   minus = "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.neg.normalized.bg"
+    #message:"generating scaled bedgraph file for {wildcards.sample}"
+    #run:
+     #   # count number of mapped reads (for bedgraph scaling) + keep number
+      #  scaling_factor = subprocess.check_output("samtools view -F 0x4 " + input[0] + " | cut -f 1 | sort | uniq | wc -l",shell=True)
+       # scaling_factor = scaling_factor.strip().decode()
+        
+	# create a bedgraph file for strand +
+#        shell("bedtools genomecov -ibam {input.bam} -bg -scale " + str(scaling_factor) + " -g {input.chroms} -strand + > {output.plus}") 
+#
+        # create a bedgraph file for strand -
+ #       shell("bedtools genomecov -ibam {input.bam} -bg -scale " + str(scaling_factor) + " -g {input.chroms} -strand - > {output.minus}")
 
 rule generate_scaled_bedgraph_strand:
     input:
-        bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam",
-        chroms = "chromSizes.tab"
+        bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.{strand}.bam",
+        chroms = "chromSizes.tab",
+        scaling = "scaling/{sample}.txt"
     output:
-        plus = temp("/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.pos.normalized.bg"),
-        minus = temp("/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.neg.normalized.bg"),
-    message:"generating scaled bedgraph file for {wildcards.sample}"
-    run:
-        # count number of mapped reads (for bedgraph scaling) + keep number
-        scaling_factor = subprocess.check_output("samtools view -F 0x4 " + input[0] + " | cut -f 1 | sort | uniq | wc -l",shell=True)
-        scaling_factor = scaling_factor.strip().decode()
-        
-	# create a bedgraph file for strand +
-        shell("bedtools genomecov -ibam {input.bam} -bg -scale " + str(scaling_factor) + " -g {input.chroms} -strand + -trackopts 'type=bedGraph name={wildcards.sample} strand +' > {output.plus}") 
+        "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.bg"
+    message:"generating scaled bedgraph file for {wildcards.sample} and for {wildcards.strand} strand"
+    shell:
+        "scalingFactor=$(cat {input.scaling});"
+        "bedtools genomecov -split -ibam {input.bam} -bg -scale $scalingFactor -g {input.chroms} > {output}"
 
-        # create a bedgraph file for strand -
-        shell("bedtools genomecov -ibam {input.bam} -bg -scale " + str(scaling_factor) + " -g {input.chroms} -strand - -trackopts 'type=bedGraph name={wildcards.sample} strand -' > {output.minus}")
+rule separate_strands:
+    input:
+        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam"
+    output:
+        pos = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.pos.bam",
+        neg = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.neg.bam"
+    message:"filtering {wildcards.sample} BAM file (separating strands)"
+    shell:
+        "samtools view -F 16 {input} > {output.pos};"
+        "samtools view -f 16 {input} > {output.neg}"
 
+rule compute_number_mapped_reads:
+    input:
+         bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam"
+    output:
+        "scaling/{sample}.txt"
+    message:"computing scaling factor for {wildcards.sample} (number of mapped reads)"   
+    shell:"samtools view -F 0x4 {input} |cut -f 1|sort|uniq|wc -l > {output}"
 
 ################################################
 ## Count read alignments per feature (e.g. gene)
@@ -128,6 +156,14 @@ rule feature_counts:
 #############################
 # Genome alignment using STAR
 #############################
+rule copy_mapping_logs:
+    input:
+        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Log.final.out"
+    output:
+        "results/mappinglogs/{sample}_Log.final.out" 
+    message:"moving mapping log for {wildcards.sample} in {output}"
+    shell:"mv {input} {output}"
+
 rule map_to_genome_using_STAR:
     input:
         ref = "./star2pass/",
