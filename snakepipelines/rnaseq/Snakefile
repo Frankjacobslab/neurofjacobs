@@ -26,6 +26,7 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 ##################
 FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
 STAR2PASS = "./star2pass/chrLength.txt"
+MAPPING_LOGS = expand("results/mappinglogs/{sample}_Log.final.out",sample=config["samples"]) 
 GENECOUNTS = "results/gene_counts.txt"
 BIGWIG = expand("/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.bw",sample=config["samples"],strand=["pos","neg"])
 MASTER_FILES = ["results/Snakefile","results/config.yaml"]
@@ -33,6 +34,7 @@ MASTER_FILES = ["results/Snakefile","results/config.yaml"]
 rule all:
 	input:
 		STAR2PASS,
+		MAPPING_LOGS,
 		#GENECOUNTS,
 		BIGWIG,
 		MASTER_FILES 
@@ -58,7 +60,7 @@ rule convert_to_bigWig:
         bedgraph = "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.sorted.bg",
         chroms = "chromSizes.tab"
     output:
-        "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.bw",
+        "results/bigwig/{sample}.{strand}.normalized.bw"
     message:"converting strand-specific bedGraph files for {wildcards.sample} and {wildcards.strand} strand to bigWig format"
     shell:
         "bedGraphToBigWig {input.bedgraph} {input.chroms} {output}"       
@@ -119,8 +121,8 @@ rule separate_strands:
         neg = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.neg.bam"
     message:"filtering {wildcards.sample} BAM file (separating strands)"
     shell:
-        "samtools view -F 16 {input} > {output.pos};"
-        "samtools view -f 16 {input} > {output.neg}"
+        "samtools view -1 -h -b -F 16 {input} > {output.pos};"
+        "samtools view -1 -h -b -f 16 {input} > {output.neg}"
 
 rule compute_number_mapped_reads:
     input:
@@ -276,7 +278,6 @@ rule fastqc_after_trimming:
         "fastqc/trimmed/{sample}/{pair}/"
     shell:"fastqc --threads {THREADS} --outdir={params} {input}"
     
-
 ###########
 ## Trimming
 ###########
@@ -286,8 +287,8 @@ rule trimmomaticPaired:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        forward = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq"),
-        reverse = temp("/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq"),
+        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq",
+        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq",
         forwardUnpaired  = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward_unpaired.fastq",
         reverseUnpaired = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse_unpaired.fastq",
     message:"Trimming {wildcards.sample} using Trimmomatic"

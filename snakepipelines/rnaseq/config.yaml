@@ -1,5 +1,5 @@
 ---
-threads: 10
+threads: 5
 fastqdir: "/home/mgalland/workspace/neurofjacobs/data/01.seqruns/20160912_dopamine_spheres/"
 samples:
   mDA_D0_1:
@@ -23,10 +23,10 @@ samples:
   mDA_D42_1:
     forward: C9JBWANXX_102867-001-004_AGACCTTG_L008_R1.fastq
     reverse: C9JBWANXX_102867-001-004_AGACCTTG_L008_R2.fastq
-  mDA_42_2:
+  mDA_D42_2:
     forward: C9JBWANXX_102867-001-005_GTCGTTAC_L008_R1.fastq
     reverse: C9JBWANXX_102867-001-005_GTCGTTAC_L008_R2.fastq
-  mDA_42_3:
+  mDA_D42_3:
     forward: C9JBWANXX_102867-001-006_GTAACCGA_L008_R1.fastq
     reverse: C9JBWANXX_102867-001-006_GTAACCGA_L008_R2.fastq
 trimmomatic:
@@ -45,8 +45,9 @@ trimmomatic:
 fastqc:
   executable: '../../scr/FastQC/fastqc'
 refseqs:
-  genomelink: 'http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.2bit'
+  genome2bit: '../../data/02.refs/hg19.2bit'
   genomefasta: '../../data/02.refs/hg19.genome.fa'
+  chromSizes: 'http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes'
 annotations:
   gtf4genes: '../../data/02.refs/knownGenes.gtf'
   gtf4repeats: '../../data/02.refs/repeats.gtf'
