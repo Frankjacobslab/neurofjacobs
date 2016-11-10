@@ -14,6 +14,9 @@ import subprocess
 # configuration file
 configfile: "config.yaml"
 
+# working directory (o clean afterwards)
+WORKING_DIR = config["workdir"]
+
 # Number of CPU (threads)
 THREADS = config["threads"]
 
@@ -27,16 +30,15 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
 STAR2PASS = "./star2pass/chrLength.txt"
 MAPPING_LOGS = expand("results/mappinglogs/{sample}_Log.final.out",sample=config["samples"]) 
-GENECOUNTS = "results/gene_counts.txt"
-BIGWIG = expand("/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.bw",sample=config["samples"],strand=["pos","neg"])
+COUNTS = ["results/counts/gene_counts.txt","results/counts/repeat_counts.txt"] 
+BIGWIGS = expand( "results/bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw",sample=config["samples"],uniqueness=["Unique","UniqueMultiple"],strand=["str1","str2"])
 MASTER_FILES = ["results/Snakefile","results/config.yaml"]
 
 rule all:
 	input:
-		STAR2PASS,
 		MAPPING_LOGS,
-		#GENECOUNTS,
-		BIGWIG,
+		COUNTS,
+		BIGWIGS,
 		MASTER_FILES 
 	message: "RNA-Seq pipeline has been successfully run"
 
@@ -57,20 +59,20 @@ rule copy_master_files:
 #########
 rule convert_to_bigWig: 
     input:
-        bedgraph = "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.sorted.bg",
+        bedgraph = WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.sorted.bg",
         chroms = "chromSizes.tab"
     output:
-        "results/bigwig/{sample}.{strand}.normalized.bw"
-    message:"converting strand-specific bedGraph files for {wildcards.sample} and {wildcards.strand} strand to bigWig format"
+        "results/bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw"
+    message:"converting strand-specific bedGraph files for {wildcards.sample}, {wildcards.uniqueness} reads and {wildcards.strand} strand to bigWig format"
     shell:
         "bedGraphToBigWig {input.bedgraph} {input.chroms} {output}"       
-
+ 
 rule sort_bedgraph:
     input:
-        "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.bg"
+         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.bg",
     output:
-        "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.sorted.bg"
-    message:"sorting {wildcards.sample} bedGraph file for strand {wildcards.strand}"
+         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.sorted.bg"
+    message:"sorting {wildcards.sample} bedGraph file for strand {wildcards.strand} and {wildcards.uniqueness} reads"
     shell:
         "bedSort {input} {output}"      
 
@@ -82,67 +84,36 @@ rule generate_chrom_sizes:
     message:"generating chromosome sizes"
     shell:"twoBitInfo {input} {output}"
 
-#rule generate_scaled_bedgraph_strand:
- #   input:
-  #      bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam",
-   #     chroms = "chromSizes.tab"
-   # output:
-    #    plus = "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.pos.normalized.bg",
-     #   minus = "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.neg.normalized.bg"
-    #message:"generating scaled bedgraph file for {wildcards.sample}"
-    #run:
-     #   # count number of mapped reads (for bedgraph scaling) + keep number
-      #  scaling_factor = subprocess.check_output("samtools view -F 0x4 " + input[0] + " | cut -f 1 | sort | uniq | wc -l",shell=True)
-       # scaling_factor = scaling_factor.strip().decode()
-        
-	# create a bedgraph file for strand +
-#        shell("bedtools genomecov -ibam {input.bam} -bg -scale " + str(scaling_factor) + " -g {input.chroms} -strand + > {output.plus}") 
-#
-        # create a bedgraph file for strand -
- #       shell("bedtools genomecov -ibam {input.bam} -bg -scale " + str(scaling_factor) + " -g {input.chroms} -strand - > {output.minus}")
-
-rule generate_scaled_bedgraph_strand:
-    input:
-        bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.{strand}.bam",
-        chroms = "chromSizes.tab",
-        scaling = "scaling/{sample}.txt"
-    output:
-        "/zfs/scratch/mgalland_temp/neuro/bigwig/{sample}.{strand}.normalized.bg"
-    message:"generating scaled bedgraph file for {wildcards.sample} and for {wildcards.strand} strand"
-    shell:
-        "scalingFactor=$(cat {input.scaling});"
-        "bedtools genomecov -split -ibam {input.bam} -bg -scale $scalingFactor -g {input.chroms} > {output}"
-
-rule separate_strands:
-    input:
-        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam"
-    output:
-        pos = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.pos.bam",
-        neg = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.neg.bam"
-    message:"filtering {wildcards.sample} BAM file (separating strands)"
-    shell:
-        "samtools view -1 -h -b -F 16 {input} > {output.pos};"
-        "samtools view -1 -h -b -f 16 {input} > {output.neg}"
-
-rule compute_number_mapped_reads:
-    input:
-         bam = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam"
-    output:
-        "scaling/{sample}.txt"
-    message:"computing scaling factor for {wildcards.sample} (number of mapped reads)"   
-    shell:"samtools view -F 0x4 {input} |cut -f 1|sort|uniq|wc -l > {output}"
-
 ################################################
 ## Count read alignments per feature (e.g. gene)
 ################################################
-rule feature_counts:
+rule count_repeats:
     input:
-        bams = expand("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam",sample=config["samples"].keys()),
+        bams = expand(WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam",sample=config["samples"].keys()),
+        annotation = config["annotations"]["gtf4repeats"],
+        genome = config["refseqs"]["genomefasta"]
+    output:
+        "results/counts/repeat_counts.txt"
+    message:"summarizing read counts for repeats"
+    shell:
+        "featureCounts "
+        "-f "				# summarize only at exon level
+        #"-t exon "			# specify how to count reads at feature level (e.g. exon)
+        "-T {THREADS} "
+        "-G {input.genome} "		# ref genome sequence
+        "-a {input.annotation} "	# annotation 
+        "-F GTF "			# SAF or GTF (by default GTF)
+        "-o {output} "
+        "{input.bams}"               	# can process more than one BAM file at once 
+
+rule count_genes:
+    input:
+        bams = expand(WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam",sample=config["samples"].keys()),
         annotation = config["annotations"]["refseqFromSubread"],
         genome = config["refseqs"]["genomefasta"]
     output:
-        "results/gene_counts.txt"
-    message:"summarizing read counts"
+        "results/counts/gene_counts.txt"
+    message:"summarizing read counts for genes"
     shell:
         "featureCounts "
         "-t exon "			# specify how to count reads at feature level (e.g. exon)
@@ -152,7 +123,7 @@ rule feature_counts:
         "-a {input.annotation} "	# annotation 
         "-F SAF "			# SAF or GTF (by default GTF)
         "-o {output} "
-        "{input}"               	# can process more than one BAM file at once 
+        "{input.bams}"               	# can process more than one BAM file at once 
         
 
 #############################
@@ -160,7 +131,7 @@ rule feature_counts:
 #############################
 rule copy_mapping_logs:
     input:
-        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Log.final.out"
+        WORKING_DIR + "mapped/{sample}_Log.final.out"
     output:
         "results/mappinglogs/{sample}_Log.final.out" 
     message:"moving mapping log for {wildcards.sample} in {output}"
@@ -169,19 +140,24 @@ rule copy_mapping_logs:
 rule map_to_genome_using_STAR:
     input:
         ref = "./star2pass/",
-        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq",
-        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq"
+        forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
+        reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq"
     output:
-        temp("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam"),
-        temp("/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Aligned.sortedByCoord.out.bam.bai"),
-        "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_Log.final.out"
+        WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam",
+        WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam.bai",
+        WORKING_DIR + "mapped/{sample}_Log.final.out",
+	WORKING_DIR + "mapped/{sample}_Signal.Unique.str1.out.bg"  
     message:"mapping the {wildcards.sample} reads to genome"
     params:
-        prefix = "/zfs/scratch/mgalland_temp/neuro/mapped/{sample}_",
+        prefix = WORKING_DIR + "mapped/{sample}_",
         maxmismatches = config["star"]["mismatches"],
         unmapped = config["star"]["unmapped"]	,
         multimappers = config["star"]["multimappers"],
-        matchNminoverLread = config["star"]["matchminoverlengthread"] 	
+        matchNminoverLread = config["star"]["matchminoverlengthread"],
+	outSamType = config["star"]["samtype"],
+        outWigType = config["star"]["outwigtype"],
+        outWigStrand = config["star"]["outwigstrand"],
+        outWigNorm = config["star"]["outwignorm"]
     shell:
             "STAR --genomeDir {input.ref} "
             "--readFilesIn {input.forward} {input.reverse} "
@@ -192,7 +168,10 @@ rule map_to_genome_using_STAR:
             "--runThreadN {THREADS} "
             "--outReadsUnmapped {params.unmapped} "
             "--outFileNamePrefix {params.prefix} "
-            "--outSAMtype BAM SortedByCoordinate;"
+            "--outSAMtype {params.outSamType} "
+            "--outWigType {params.outWigType} "
+            "--outWigStrand {params.outWigStrand} "
+            "--outWigNorm {params.outWigNorm};"
             "samtools index {output[0]}"
 
 #####################################################################
@@ -232,8 +211,8 @@ rule concatenate_sjdb:
 
 rule star1pass_align:
     input:
-        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq",
-        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq", 
+        forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
+        reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq", 
         ref = "star_index/"
     output:
         "./star1pass/{sample}_SJ.out.tab",
@@ -270,7 +249,7 @@ rule star_genome_index:
 ################################
 rule fastqc_after_trimming:
     input:
-        "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_{pair}.fastq"
+        WORKING_DIR + "trimmed/{sample}_{pair}.fastq"
     output:
         "fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html"
     message:"generating fastqc report for trimmed reverse {wildcards.sample} reads"
@@ -287,10 +266,10 @@ rule trimmomaticPaired:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        forward = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward.fastq",
-        reverse = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse.fastq",
-        forwardUnpaired  = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_forward_unpaired.fastq",
-        reverseUnpaired = "/zfs/scratch/mgalland_temp/neuro/trimmed/{sample}_reverse_unpaired.fastq",
+        forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
+        reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq",
+        forwardUnpaired  = WORKING_DIR + "trimmed/{sample}_forward_unpaired.fastq",
+        reverseUnpaired = WORKING_DIR + "trimmed/{sample}_reverse_unpaired.fastq",
     message:"Trimming {wildcards.sample} using Trimmomatic"
     log:"results/trimlogs/{sample}.trimlog"
     params :

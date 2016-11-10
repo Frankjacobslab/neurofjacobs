@@ -1,6 +1,7 @@
 ---
 threads: 5
 fastqdir: "/home/mgalland/workspace/neurofjacobs/data/01.seqruns/20160912_dopamine_spheres/"
+workdir: "/zfs/scratch/mgalland_temp/neuro/"
 samples:
   mDA_D0_1:
     forward: huESC_fj74_R1.fastq
@@ -53,6 +54,17 @@ annotations:
   gtf4repeats: '../../data/02.refs/repeats.gtf'
   refseqFromSubread: '../../data/02.refs/hg19_RefSeq_exon.txt'
 star:
+  # type of output
+  samtype: 'BAM SortedByCoordinate'
+  # wig type
+  outwigtype: 'bedGraph'  
+  # strandness of wig file
+  outwigstrand: 'Stranded' 
+  # normalization method for wig file (None or RPM = reads per million). 
+  # RPM = read raw count / total number of uniquely mapping reads *10⁶  (for ".Unique." signal files)
+  # RPM = read raw count / total number of unique and multiple mapping reads (for ".UniqueMultiple." signal files)
+  # These RPM normalizations are used by the ENCODE consortium. 
+  outwignorm: 'RPM'
   # alignment will be output only if it has less mismatches than this number
   mismatches: '2'
   # unmapped accepted values are None or Fastx (to output fastq files of unmapped reads)
@@ -61,3 +73,5 @@ star:
   multimappers: '10'
   # alignment will be output if percentage of read length is higher than this value (66% of 2x100bp = 132 nucleotides)
   matchminoverlengthread: '0.66'
+  # extract
+  
