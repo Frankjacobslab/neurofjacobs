@@ -8,8 +8,8 @@ output:
         toc: yes
         toc_depth: 2  
 params:
-  counts: "../../../results/20160928_counts/counts.txt"
-  design: "../../../results/20160928_counts/design.txt"
+  counts: "../../../results/20161109_counts/repeat_counts.parsed.txt"
+  design: "../../../results/20161109_counts/design.txt"
 ---
 # introduction
 DESeq2 performs a differential expression analysis at the gene level using __raw counts__ from RNA-Seq reads aligned to a reference sequence (genome in most cases) and a __experimental design__ file that lists factors of interest. 
@@ -17,15 +17,19 @@ DESeq2 performs a differential expression analysis at the gene level using __raw
 From the [documentation](https://bioconductor.org/packages/release/bioc/html/DESeq2.html): 
 > It uses the negative binomial distribution and a shrinkage estimator for the distribution variance. 
 
-## Original paper and further reading
+__Original paper and further reading__
 *  Please cite Anders & Huber [original paper](https://www.ncbi.nlm.nih.gov/pubmed/20979621)
 *  A detailed protocol for RNA-Seq based differential expression can be found [here](https://www.ncbi.nlm.nih.gov/pubmed/23975260)
 
-
 # configuration
+
+## Knitr
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,message = FALSE,warning=FALSE)
+```
 ## Load libraries
-```{r load libraries}
-library(DESeq2)
+```{r load libraries,warning=FALSE,message=FALSE}
+library(DESeq2,quietly = T)
 library(ezknitr)
 library(dplyr)
 library(pheatmap)
@@ -36,7 +40,7 @@ library(RColorBrewer)
 
 ## Data input
 Loads raw counts and experimental design file. Values are defined in the Rmarkdown file header (YAML header)
-```{r load data and create Count Data Set object}
+```{r load data and create Count Data Set object,warning=FALSE,message=FALSE}
 # import counts
 counts = read.delim(file = params$counts,sep = "\t",stringsAsFactors = F)
 row.names(counts)=counts[,1]
@@ -53,18 +57,32 @@ cds = DESeqDataSetFromMatrix(countData = counts,colData = design,design = ~ cond
 
 ## scaling and dispersion computations 
 From the paper [here](https://www.ncbi.nlm.nih.gov/pubmed/23975260)
+
 > Analogously, DESeq defines a virtual reference sample by taking the median of each gene’s values across samples and then computes size factors as the median of ratios of each sample to the reference sample. Generally, the ratios of the size factors should roughly match the ratios of the library sizes. Dividing each column of the count table by the corresponding size factor yields normalized count values, which can be scaled to give a counts per million interpretation (see also edgeR’s cpm function). From an M (log ratio) versus A (log expression strength) plot, count data sets typically show a (left-facing) trombone shape, reflecting the higher variability of log ratios at lower counts (Fig. 6). In addition, points will typically be centered around a log ratio of 0 if the normalization factors are calculated appropriately, although this is just a general guide.
 
-```{r scaling and dispersion}
+```{r scaling}
 # estimate size factors
 cds = estimateSizeFactors(cds)
 
 # print these size factors (should be quite close to the number of reads in the libraries)
-sizeFactors(cds)
+knitr::kable(as.data.frame(sizeFactors(cds)))
+```
+
+```{r Save scaled count table}
+# create and save scaled count table
+scaled.counts = counts(cds,normalized=T)
+write.table(scaled.counts,file = "scaled_counts.txt",sep = "\t",row.names = F)
+
+# Before scaling
+head(counts(cds,normalized=FALSE))
+
+# After scaling
+head(scaled.counts)
+
 ```
 
 Calculate dispersion: sample-to-sample variation + uncertainty in measuring a concentration)
-```{r}
+```{r dispersion,message=FALSE,warning=FALSE}
 # calculate dispersion for each gene
 cds = estimateDispersions(cds)
 
@@ -76,12 +94,15 @@ plotDispEsts(cds)
 
 ## Principal Component Analysis
 The `rlog` function:
+
 > This function transforms the count data to the log2 scale in a way which minimizes differences between samples for rows with small counts, and which normalizes with respect to library size. The rlog transformation produces a similar variance stabilizing effect as varianceStabilizingTransformation, though rlog is more robust in the case when the size factors vary widely. The transformation is useful when checking for outliers or as input for machine learning techniques such as clustering or linear discriminant analysis. rlog takes as input a DESeqDataSet and returns a RangedSummarizedExperiment object.
 
 The `varianceStabilizingTransformation` function
+
 > This function calculates a variance stabilizing transformation (VST) from the fitted dispersion-mean relation(s) and then transforms the count data (normalized by division by the size factors or normalization factors), yielding a matrix of values which are now approximately homoskedastic (having constant variance along the range of mean values). The transformation also normalizes with respect to library size. The rlog is less sensitive to size factors, which can be an issue when size factors vary widely. These transformations are useful when checking for outliers or as input for machine learning techniques such as clustering or linear discriminant analysis.
 
 The `blind=TRUE/FALSE` option	
+
 > logical, whether to blind the transformation to the experimental design. blind=TRUE should be used for comparing samples in an manner unbiased by prior information on samples, for example to perform sample QA (quality assurance). blind=FALSE should be used for transforming data for downstream analysis, where the full use of the design information should be made. blind=FALSE will skip re-estimation of the dispersion trend, if this has already been calculated. If many of genes have large differences in counts due to the experimental design, it is important to set blind=FALSE for downstream analysis.
 
 ```{r PCA}
@@ -125,6 +146,7 @@ This function performs a default differential expression analysis through the st
 
 ### Likelihood test
 To extract results, you need the `results` function that requires a contrast to extract comparisons.
+
 > The `contrast` argument takes a character vector with exactly three elements: the name of a factor in the design formula, the name of the numerator level for the fold change, and the name of the denominator level for the fold change (simplest case) 
 
 ```{r}
@@ -151,6 +173,7 @@ write.table(D42_vs_D28,file="diff_lrt_D42vsD28.txt",quote = F,row.names = F ,sep
 ```
 
 __Value__: 
+
 > It outputs a DESeqResults object, which is a simple subclass of DataFrame. This object contains the results columns: baseMean, log2FoldChange, lfcSE, stat, pvalue and padj, and also includes metadata columns of variable information. The lfcSE gives the standard error of the log2FoldChange. For the Wald test, stat is the Wald statistic: the log2FoldChange divided by lfcSE, which is compared to a standard Normal distribution to generate a two-tailed pvalue. __For the likelihood ratio test (LRT), stat is the difference in deviance between the reduced model and the full model, which is compared to a chi-squared distribution to generate a pvalue__.For resultsNames: the names of the columns available as results, usually a combination of the variable name and a levelFor removeResults: the original DESeqDataSet with results metadata columns removed 
  
 # session info 
