@@ -3,7 +3,7 @@ You can clone the whole directory using: `git clone https://github.com/mgalland/
 
 ## Data origin
 ### Annotations
-The repeats.gtf and knownGenes.gtf were downloaded using the UCSC table browser (2016-09-12). Human genome __hg19/GRCh37__ was used. RepeatMasker was used to get the repeats annotation. 
+The repeats.gtf, repeats.fasta and knownGenes.gtf were downloaded using the UCSC table browser (2016-09-12). Human genome __hg19/GRCh37__ was used. RepeatMasker was used to get the repeats annotation. 
 ### Genome sequence
 The hg19.genome.fa sequence was obtained by converting the `hg19.2bit` to FASTA format using the `twoBitToFa` program (available online). 
 ### Sequencing data
