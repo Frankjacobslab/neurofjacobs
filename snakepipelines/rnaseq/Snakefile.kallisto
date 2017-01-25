@@ -26,11 +26,13 @@ THREADS = config["threads"]
 ## Desired outputs
 ####################
 
-KALLISTO = expand("results/{sample}.abundance.tsv",sample=SAMPLES)
+KALLISTO = expand("results/{sample}/abundance.tsv",sample=SAMPLES)
+PSEUDOBAMS = expand("results/kallisto/{sample}/aln.bam",sample=SAMPLES)
 
 rule all:
 	input:
-		KALLISTO
+		KALLISTO,
+		PSEUDOBAMS
 	message:"all done"
 
 #######################################
@@ -44,12 +46,12 @@ rule kallisto_pseudobam:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        "results/{sample}.bam"
+        "results/kallisto/{sample}/aln.bam"
     message:"computing {wildcards.sample} pseudo BAM file using kallisto"
-    params:"results/"
+    params:"results/{sample}/"
     shell:
         "kallisto quant -i {input.index} "
-        "-o {params} --threads {THREADS} "
+        "--output-dir {params} "
         "--pseudobam "
         "{input.forward} {input.reverse} |samtools view -Sb - > {output}"
 
@@ -60,13 +62,15 @@ rule kallisto_abundances:
         forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"],
         reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"]
     output:
-        "results/{sample}.abundance.tsv"
+        "results/{sample}/abundance.tsv"
     message:"computing {wildcards.sample} abundances using kallisto"
-    params:"results/"
-    log:"results/tsv/{sample}.log.txt"
+    params:"results/{sample}/"
+    log:"results/kallisto_logs/{sample}.log.txt"
     shell:
         "kallisto quant -i {input.index} "
-        "-o {params} -b 100 --threads {THREADS} "
+        "--output-dir {params} "
+        "-b 100 "
+        "--threads {THREADS} "
         " --seed=42 "
         "{input.forward} {input.reverse} "
         " 2>{log}"
