@@ -3,3 +3,5 @@
 *fastq.gz
 *.gz
 *.xlsx
+data/02.refs/*.fa
+data/02.refs/*2bit
