@@ -4,4 +4,7 @@
 *.gz
 *.xlsx
 data/02.refs/*.fa
+data/02.refs/*fasta
+data/02.refs/hg19_RefSeq_exon.txt
 data/02.refs/*2bit
+data/02.refs/*gtf
