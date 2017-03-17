@@ -52,5 +52,6 @@ so = sleuth_lrt(so,"reduced","full")
 
 #sleuth_results(likelihood ratio test)
 sr <- sleuth_results(so,"reduced:full","lrt")
+sr <- na.omit(sr)
 write.table(sr,file.path(outdir,"sleuth_results.txt",sep="\t",row.names=F)
 

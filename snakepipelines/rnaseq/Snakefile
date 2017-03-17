@@ -42,9 +42,9 @@ rule all:
 		MASTER_FILES 
 	message: "RNA-Seq pipeline has been successfully run"
 
-##############################################
-## version documentation and copy master files
-##############################################
+#######################
+##  copy master files
+#######################
 rule copy_master_files:
     output:
         "results/Snakefile",
@@ -83,6 +83,10 @@ rule generate_chrom_sizes:
         "chromSizes.tab"
     message:"generating chromosome sizes"
     shell:"twoBitInfo {input} {output}"
+
+#rule generate_fasta_genome:
+## download hg19.2bit
+## convert to fasta file
 
 ################################################
 ## Count read alignments per feature (e.g. gene)
@@ -126,9 +130,11 @@ rule count_genes:
         "{input.bams}"               	# can process more than one BAM file at once 
         
 
+
 #############################
 # Genome alignment using STAR
 #############################
+
 rule copy_mapping_logs:
     input:
         WORKING_DIR + "mapped/{sample}_Log.final.out"
