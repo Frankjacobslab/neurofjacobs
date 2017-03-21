@@ -1,0 +1,135 @@
+---
+title: "Statistics on gene counts"
+author: "Marc Galland"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+        number_sections: yes
+        toc: yes
+        toc_depth: 2  
+params:
+  counts: "../../../results/20160928_counts/counts.txt"
+  design: "../../../results/20160928_counts/design.txt"
+  humangenes: "../../../data/02.refs/humanGenes.txt"
+  outdir: "../../../results/20170127_scaled_counts_averages/"
+---
+# introduction
+Using DESeq2 package to compute scaled counts from mappings and feature counts. 
+It uses __raw counts__ from RNA-Seq reads aligned to a reference sequence (genome in most cases) and a __experimental design__ file that lists factors of interest. 
+
+Check the [documentation](https://bioconductor.org/packages/release/bioc/html/DESeq2.html)
+
+# configuration
+
+## Knitr
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,message = FALSE,warning=FALSE)
+```
+## Load libraries
+```{r load libraries,warning=FALSE,message=FALSE}
+library(DESeq2,quietly = T)
+library(ezknitr)
+library(dplyr)
+library(RColorBrewer)
+library(data.table)
+library(reshape2)
+```
+
+# Scaling using DESeq2
+
+## Data input
+Loads raw counts and experimental design file. Values are defined in the Rmarkdown file header (YAML header)
+```{r load data and create Count Data Set object,warning=FALSE,message=FALSE}
+# import counts
+counts = read.delim(file = params$counts,sep = "\t",stringsAsFactors = F,header = T)
+row.names(counts)=counts$Geneid
+counts$Geneid = NULL
+
+# experiment design
+design = read.delim(file = params$design,sep="\t",stringsAsFactors=F)
+row.names(design)=design$sample
+design$sample <- NULL
+
+# convert to a CountDataSet object 
+cds = DESeqDataSetFromMatrix(countData = counts,colData = design,design = ~ condition)
+```
+
+## scaling
+From the paper [here](https://www.ncbi.nlm.nih.gov/pubmed/23975260)
+
+> Analogously, DESeq defines a virtual reference sample by taking the median of each gene’s values across samples and then computes size factors as the median of ratios of each sample to the reference sample. Generally, the ratios of the size factors should roughly match the ratios of the library sizes. Dividing each column of the count table by the corresponding size factor yields normalized count values, which can be scaled to give a counts per million interpretation (see also edgeR’s cpm function). From an M (log ratio) versus A (log expression strength) plot, count data sets typically show a (left-facing) trombone shape, reflecting the higher variability of log ratios at lower counts (Fig. 6). In addition, points will typically be centered around a log ratio of 0 if the normalization factors are calculated appropriately, although this is just a general guide.
+
+> From Simon Anders
+To estimate the library size, simply taking the total number of (mapped or unmapped) reads is, in our experience, not a good idea.
+Sometimes, a few very strongly expressed genes are differentially expressed, and as they make up a good part of the total counts, they skew this number. After you divide by total counts, these few strongly expressed genes become equal, and the whole rest looks differentially expressed.
+The following simple alternative works much better:
+- Construct a "reference sample" by taking, for each gene, the geometric mean of the counts in all samples.
+- To get the sequencing depth of a sample relative to the reference, calculate for each gene the quotient of the counts in your sample divided by the counts of the reference sample. Now you have, for each gene, an estimate of the depth ratio.
+- Simply take the median of all the quotients to get the relative depth of the library.
+This is what the 'estimateSizeFactors' function of our DESeq package does. 
+
+```{r scaling}
+# estimate size factors
+cds = estimateSizeFactors(cds)
+
+# print these size factors (should be quite close to the number of reads in the libraries)
+knitr::kable(as.data.frame(sizeFactors(cds)))
+```
+
+```{r Save scaled count table}
+# create and save scaled count table
+scaled.counts = counts(cds,normalized=T)
+write.table(scaled.counts,file = "scaled_counts.txt",sep = "\t",row.names = F)
+
+# Before scaling
+head(counts(cds,normalized=FALSE))
+
+# After scaling
+head(scaled.counts)
+
+```
+
+# Write the scaled count tables
+```{r Averages}
+scaled.counts = as.data.frame(counts(cds,normalized=T))
+scaled.counts$gene = row.names(scaled.counts)
+m_scaled.counts = reshape2::melt(data = scaled.counts,id.vars=c("gene"),variable.name="time",value.name="counts")
+colnames(m_scaled.counts)[1]="entrezgene"
+
+# get design table and add experimental factor to group by
+designTable = design
+designTable$time = row.names(designTable)
+m_scaled.counts = left_join(m_scaled.counts,designTable,by="time")
+#dcast_scaled.counts = reshape2::dcast(data = test,formula = entrezgene+ condition ~ counts,fun.aggregate = mean,value.var = "counts")
+
+# compute averages
+averages = m_scaled.counts %>%
+  group_by(entrezgene,condition) %>%
+  summarise(mean = mean(counts))
+
+# long to wide format
+meansPergenePercondition = dcast(averages,entrezgene ~ condition) 
+
+# get the correspondence with human genes
+entrez2human = read.delim(file = params$humangenes,header=T,stringsAsFactors=F)
+entrez2human$entrezgene = as.character(entrez2human$entrezgene)
+entrez2human = unique(entrez2human[c("entrezgene","hgnc_symbol")])
+meansPergenePercondition = left_join(meansPergenePercondition,entrez2human[c("entrezgene","hgnc_symbol")],by="entrezgene")
+
+# write table
+write.table(x = meansPergenePercondition,file = file.path(params$outdir,"meansPerGenePerTimepoint.txt"),quote = F,sep = "\t",row.names=F)
+```
+
+# Filter scaled counts table by a certain threshold
+```{r}
+meansPergenePercondition.filtered = filter(meansPergenePercondition,D0 > 10) # you can also specify OR AND... && & |
+
+```
+
+
+# session info 
+Records package versions, R version...
+```{r session}
+sessionInfo()
+```
+
