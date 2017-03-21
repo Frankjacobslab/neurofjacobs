@@ -1,0 +1,39 @@
+------------------------------------------------------------------
+fj74 SEQUENCES:
+
+fj74 was sequenced as part of a pool that was sequenced on 2 lanes,
+referred to as pools "P1" and "P2" on lanes L4 and L5.
+
+At that time, the sequencing center was delivering all reads, including
+those which failed to pass Illumina filters (marked as "Y").
+
+In this directory, the files for each lane include only the "N" reads,
+which did Not fail to pass the filters.
+
+The _1.fastq.gz are read1
+The _2.fastq.gz are read2
+
+Counts were:
+
+                  total     numN   pctN
+poolP1
+huESC_fj74       15.89M   14.77M  93.0%
+poolP2
+huESC_fj74       16.09M   14.65M  91.1%
+
+-----------------------------------------------------------------
+fj95 and fj96 SEQUENCES:
+
+At the time these were sequenced, the sequencing center delivered the
+fastq files in files containing 4 million or fewer reads. (All files have 4M
+except the highest numbered file.)
+
+All of these reads were "N" (passed filter).
+
+The _R1_ files are read1
+The _R2_ files are read2
+
+poolAA     
+huESC_fj095     total:  46.85M
+huESC_fj096     total:  44.52M
+

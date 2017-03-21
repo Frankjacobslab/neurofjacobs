@@ -1,0 +1,10 @@
+sample	time	
+mDA_D0_2	D0	
+mDA_D0_3	D0	
+mDA_D0_1	D0	
+mDA_D28_3	D28	
+mDA_D28_2	D28	
+mDA_D28_1	D28	
+mDA_D42_1	D42	
+mDA_D42_2	D42	
+mDA_D42_3	D42	
