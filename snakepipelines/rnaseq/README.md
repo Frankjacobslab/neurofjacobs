@@ -43,13 +43,13 @@ annotations:
 ## samples
 Provide a list of samples
 samples:
-  mDA_D0_1:
-    forward: huESC_fj74_R1.fastq
-    reverse: huESC_fj74_R2.fastq
-  mDA_D0_2:
-    forward: fj95_TGACCA_R1.fastq
-    reverse: fj95_TGACCA_R2.fastq
-  etc.   
+* mDA_D0_1:
+  * forward: huESC_fj74_R1.fastq
+  * reverse: huESC_fj74_R2.fastq
+* mDA_D0_2:
+  * forward: fj95_TGACCA_R1.fastq
+  * reverse: fj95_TGACCA_R2.fastq
+etc.   
 
 ## Parameters for softwares used
 Trimmomatic (trimming and quality check)
