@@ -30,14 +30,15 @@ This file is used to customize the analysis.
 
 ## Genomic references and annotations
 refseqs:
-  genome2bit: '../../data/02.refs/hg19.2bit'
-  genomefasta: '../../data/02.refs/hg19.genome.fa'
-  chromSizes: 'http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes'
-  repeatsfasta: '../../data/02.refs/repeats.parsed.fasta'
+* genome2bit: '../../data/02.refs/hg19.2bit'
+* genomefasta: '../../data/02.refs/hg19.genome.fa'
+* chromSizes: 'http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes'
+* repeatsfasta: '../../data/02.refs/repeats.parsed.fasta'
+
 annotations:
-  gtf4genes: '../../data/02.refs/knownGenes.gtf'
-  gtf4repeats: '../../data/02.refs/repeats.gtf'
-  refseqFromSubread: '../../data/02.refs/hg19_RefSeq_exon.txt'
+* gtf4genes: '../../data/02.refs/knownGenes.gtf'
+* gtf4repeats: '../../data/02.refs/repeats.gtf'
+* refseqFromSubread: '../../data/02.refs/hg19_RefSeq_exon.txt'
 
 ## samples
 Provide a list of samples
