@@ -28,10 +28,10 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 ## Desired outputs
 ##################
 FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
-STAR2PASS = "./star2pass/chrLength.txt"
 MAPPING_LOGS = expand("results/mappinglogs/{sample}_Log.final.out",sample=config["samples"]) 
 COUNTS = ["results/counts/gene_counts.txt","results/counts/repeat_counts.txt"] 
 BIGWIGS = expand( "results/bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw",sample=config["samples"],uniqueness=["Unique","UniqueMultiple"],strand=["str1","str2"])
+
 MASTER_FILES = ["results/Snakefile","results/config.yaml"]
 
 rule all:
@@ -65,16 +65,7 @@ rule convert_to_bigWig:
         "results/bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw"
     message:"converting strand-specific bedGraph files for {wildcards.sample}, {wildcards.uniqueness} reads and {wildcards.strand} strand to bigWig format"
     shell:
-        "bedGraphToBigWig {input.bedgraph} {input.chroms} {output}"       
- 
-rule sort_bedgraph:
-    input:
-         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.bg",
-    output:
-         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.sorted.bg"
-    message:"sorting {wildcards.sample} bedGraph file for strand {wildcards.strand} and {wildcards.uniqueness} reads"
-    shell:
-        "bedSort {input} {output}"      
+        "bedGraphToBigWig {input.bedgraph} {input.chroms} {output}"        
 
 rule generate_chrom_sizes:
     input:
@@ -84,9 +75,14 @@ rule generate_chrom_sizes:
     message:"generating chromosome sizes"
     shell:"twoBitInfo {input} {output}"
 
-#rule generate_fasta_genome:
-## download hg19.2bit
-## convert to fasta file
+rule sort_bedgraph:
+    input:
+         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.bg"
+    output:
+         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.sorted.bg"
+    message:"sorting {wildcards.sample} bedGraph file for strand {wildcards.strand} and {wildcards.uniqueness} reads"
+    shell:
+        "bedSort {input} {output}"   
 
 ################################################
 ## Count read alignments per feature (e.g. gene)
@@ -134,7 +130,6 @@ rule count_genes:
 #############################
 # Genome alignment using STAR
 #############################
-
 rule copy_mapping_logs:
     input:
         WORKING_DIR + "mapped/{sample}_Log.final.out"
@@ -145,14 +140,17 @@ rule copy_mapping_logs:
 
 rule map_to_genome_using_STAR:
     input:
-        ref = "./star2pass/",
+        ref = "star2pass/",
         forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
         reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq"
     output:
         WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam",
         WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam.bai",
         WORKING_DIR + "mapped/{sample}_Log.final.out",
-	WORKING_DIR + "mapped/{sample}_Signal.Unique.str1.out.bg"  
+	WORKING_DIR + "mapped/{sample}_Signal.Unique.str1.out.bg",
+        WORKING_DIR + "mapped/{sample}_Signal.Unique.str2.out.bg",
+        WORKING_DIR + "mapped/{sample}_Signal.UniqueMultiple.str1.out.bg",
+        WORKING_DIR + "mapped/{sample}_Signal.UniqueMultiple.str2.out.bg"        
     message:"mapping the {wildcards.sample} reads to genome"
     params:
         prefix = WORKING_DIR + "mapped/{sample}_",
@@ -186,11 +184,11 @@ rule map_to_genome_using_STAR:
 rule star2pass_index:
     input:
         sjdb = "./star1pass/SJ.concatenated.out.tab",
-        directory = "./star2pass/", 
+        directory = "star2pass/", 
         ref= config["refseqs"]["genomefasta"],
         gtf = config["annotations"]["gtf4genes"]
     output:
-        STAR_2PASS = ["./star2pass/"+f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]]
+        STAR_2PASS = ["star2pass/"+f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]]
     message: "STAR 2nd pass: generating genome index"	
     shell:
         "STAR --runMode genomeGenerate "
@@ -203,9 +201,9 @@ rule star2pass_index:
         "touch -h {output}"
 
 rule create_star2pass_directory:
-    output:"./star2pass/"
+    output:"star2pass/"
     message:"create directory for star2pass"
-    shell:"mkdir -p ./star2pass/"
+    shell:"mkdir -p star2pass/"
 
 rule concatenate_sjdb:
     input:
@@ -261,7 +259,8 @@ rule fastqc_after_trimming:
     message:"generating fastqc report for trimmed reverse {wildcards.sample} reads"
     params:
         "fastqc/trimmed/{sample}/{pair}/"
-    shell:"fastqc --threads {THREADS} --outdir={params} {input}"
+    shell:
+        "fastqc --threads {THREADS} --outdir={params} {input}"
     
 ###########
 ## Trimming
