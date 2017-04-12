@@ -241,6 +241,7 @@ rule star_genome_index:
     params:
         WORKING_DIR + "star_index/"
     shell:
+        "mkdir -p {params};"
         "STAR --runMode genomeGenerate "
         "--genomeDir {params} "
         "--genomeFastaFiles {input.genome} "
