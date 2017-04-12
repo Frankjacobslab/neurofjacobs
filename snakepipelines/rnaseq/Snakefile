@@ -140,7 +140,7 @@ rule copy_mapping_logs:
 
 rule map_to_genome_using_STAR:
     input:
-        ref = "star2pass/",
+        ref = [WORKING_DIR + "star2pass/"+f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]],
         forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
         reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq"
     output:
@@ -183,12 +183,12 @@ rule map_to_genome_using_STAR:
 #####################################################################
 rule star2pass_index:
     input:
-        sjdb = "./star1pass/SJ.concatenated.out.tab",
+        sjdb = WORKING_DIR + "star1pass/SJ.concatenated.out.tab",
         directory = "star2pass/", 
         ref= config["refseqs"]["genomefasta"],
         gtf = config["annotations"]["gtf4genes"]
     output:
-        STAR_2PASS = ["star2pass/"+f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]]
+        STAR_2PASS = [WORKING_DIR + "star2pass/"+f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]]
     message: "STAR 2nd pass: generating genome index"	
     shell:
         "STAR --runMode genomeGenerate "
@@ -200,16 +200,11 @@ rule star2pass_index:
         "--sjdbGTFfile {input.gtf};"
         "touch -h {output}"
 
-rule create_star2pass_directory:
-    output:"star2pass/"
-    message:"create directory for star2pass"
-    shell:"mkdir -p star2pass/"
-
 rule concatenate_sjdb:
     input:
-        expand("./star1pass/{sample}_SJ.out.tab",sample=config["samples"].keys()),
+        expand(WORKING_DIR + "star1pass/{sample}_SJ.out.tab",sample=config["samples"].keys()),
     output:
-        "./star1pass/SJ.concatenated.out.tab"
+        WORKING_DIR + "star1pass/SJ.concatenated.out.tab"
     message:"concatenating splice junctions from different samples "
     shell:"cat {input} >> {output}"
 
@@ -217,12 +212,13 @@ rule star1pass_align:
     input:
         forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
         reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq", 
-        ref = "star_index/"
+        ref = WORKING_DIR + "star_index/"
     output:
-        "./star1pass/{sample}_SJ.out.tab",
-        temp("./star1pass/{sample}_Aligned.out.sam")
+        WORKING_DIR + "star1pass/{sample}_SJ.out.tab",
+        temp(WORKING_DIR + "star1pass/{sample}_Aligned.out.sam")
     message:"STAR 1st pass: aligning {wildcards.sample} reads to generate splice junction files"
-    params:"./star1pass/{sample}_"	
+    params:
+        WORKING_DIR + "star1pass/{sample}_"	
     shell: 		
         "STAR --runMode alignReads "
         "--genomeDir {input.ref} "
@@ -237,9 +233,10 @@ rule star_genome_index:
         genome = config["refseqs"]["genomefasta"],
         gtf = config["annotations"]["gtf4genes"]
     output:
-        "star_index/"
+        WORKING_DIR + "star_index/"
     message:"generation STAR genome index" 
-    params:"star_index/"
+    params:
+        WORKING_DIR + "star_index/"
     shell:
         "STAR --runMode genomeGenerate "
         "--genomeDir {params} "
