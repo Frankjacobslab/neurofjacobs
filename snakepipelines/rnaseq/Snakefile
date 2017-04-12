@@ -16,6 +16,7 @@ configfile: "config.yaml"
 
 # working directory (o clean afterwards)
 WORKING_DIR = config["workdir"]
+RESULT_DIR = config["resultdir"]
 
 # Number of CPU (threads)
 THREADS = config["threads"]
@@ -28,11 +29,11 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 ## Desired outputs
 ##################
 FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
-MAPPING_LOGS = expand("results/mappinglogs/{sample}_Log.final.out",sample=config["samples"]) 
-COUNTS = ["results/counts/gene_counts.txt","results/counts/repeat_counts.txt"] 
-BIGWIGS = expand( "results/bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw",sample=config["samples"],uniqueness=["Unique","UniqueMultiple"],strand=["str1","str2"])
+MAPPING_LOGS = expand(RESULT_DIR + "mappinglogs/{sample}_Log.final.out",sample=config["samples"]) 
+COUNTS = [RESULT_DIR + f for f in ["counts/gene_counts.txt","counts/repeat_counts.txt"]] 
+BIGWIGS = expand(RESULT_DIR + "bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw",sample=config["samples"],uniqueness=["Unique","UniqueMultiple"],strand=["str1","str2"])
 
-MASTER_FILES = ["results/Snakefile","results/config.yaml"]
+MASTER_FILES = [RESULT_DIR + f for f in ["Snakefile","config.yaml","environment.yaml"]]
 
 rule all:
 	input:
@@ -47,12 +48,14 @@ rule all:
 #######################
 rule copy_master_files:
     output:
-        "results/Snakefile",
-        "results/config.yaml"
+        RESULT_DIR + "Snakefile",
+        RESULT_DIR + "config.yaml",
+        RESULT_DIR + "environment.yaml"
     message:"copying master files (Snakefile and configuration files)"
     shell:
-        "cp Snakefile results/;"
-        "cp config.yaml results/"
+        "cp Snakefile {RESULT_DIR};"
+        "cp config.yaml {RESULT_DIR};"
+        "cp environment.yaml {RESULT_DIR}"
 
 #########
 ## bigWig
@@ -62,7 +65,7 @@ rule convert_to_bigWig:
         bedgraph = WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.sorted.bg",
         chroms = "chromSizes.tab"
     output:
-        "results/bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw"
+        RESULT_DIR + "bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw"
     message:"converting strand-specific bedGraph files for {wildcards.sample}, {wildcards.uniqueness} reads and {wildcards.strand} strand to bigWig format"
     shell:
         "bedGraphToBigWig {input.bedgraph} {input.chroms} {output}"        
@@ -93,7 +96,7 @@ rule count_repeats:
         annotation = config["annotations"]["gtf4repeats"],
         genome = config["refseqs"]["genomefasta"]
     output:
-        "results/counts/repeat_counts.txt"
+        RESULT_DIR + "counts/repeat_counts.txt"
     message:"summarizing read counts for repeats"
     shell:
         "featureCounts "
@@ -112,7 +115,7 @@ rule count_genes:
         annotation = config["annotations"]["refseqFromSubread"],
         genome = config["refseqs"]["genomefasta"]
     output:
-        "results/counts/gene_counts.txt"
+        RESULT_DIR + "counts/gene_counts.txt"
     message:"summarizing read counts for genes"
     shell:
         "featureCounts "
@@ -134,7 +137,7 @@ rule copy_mapping_logs:
     input:
         WORKING_DIR + "mapped/{sample}_Log.final.out"
     output:
-        "results/mappinglogs/{sample}_Log.final.out" 
+        RESULT_DIR + "mappinglogs/{sample}_Log.final.out" 
     message:"moving mapping log for {wildcards.sample} in {output}"
     shell:"mv {input} {output}"
 
