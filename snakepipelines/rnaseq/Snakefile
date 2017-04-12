@@ -211,7 +211,7 @@ rule concatenate_sjdb:
 rule star1pass_align:
     input:
         forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
-        reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq", 
+        reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq",
         ref = WORKING_DIR + "star_index/"
     output:
         WORKING_DIR + "star1pass/{sample}_SJ.out.tab",
@@ -243,7 +243,7 @@ rule star_genome_index:
         "--genomeFastaFiles {input.genome} "
         "--runThreadN {THREADS} "
         "--sjdbOverhang 99 "
-        "-sjdbGTFfile {input.gtf}"
+        "--sjdbGTFfile {input.gtf}"
 
 ################################
 ## Fastqc reports after trimming
