@@ -186,16 +186,17 @@ rule map_to_genome_using_STAR:
 #####################################################################
 rule star2pass_index:
     input:
-        sjdb = WORKING_DIR + "star1pass/SJ.concatenated.out.tab",
-        directory = "star2pass/", 
+        sjdb = WORKING_DIR + "star1pass/SJ.concatenated.out.tab", 
         ref= config["refseqs"]["genomefasta"],
         gtf = config["annotations"]["gtf4genes"]
     output:
-        STAR_2PASS = [WORKING_DIR + "star2pass/"+f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]]
+        STAR_2PASS = [WORKING_DIR + "star2pass/"+ f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]]
     message: "STAR 2nd pass: generating genome index"	
+    params:
+        WORKING_DIR + "star2pass/"
     shell:
         "STAR --runMode genomeGenerate "
-        "--genomeDir {input.directory} "
+        "--genomeDir {params} "
         "--genomeFastaFiles {input.ref} "
         "--runThreadN {THREADS} "
         "--sjdbFileChrStartEnd {input.sjdb} "
