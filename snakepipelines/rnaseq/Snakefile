@@ -164,9 +164,10 @@ rule map_to_genome_using_STAR:
 	outSamType = config["star"]["samtype"],
         outWigType = config["star"]["outwigtype"],
         outWigStrand = config["star"]["outwigstrand"],
-        outWigNorm = config["star"]["outwignorm"]
+        outWigNorm = config["star"]["outwignorm"],
+        genomedir = WORKING_DIR + "star2pass/"
     shell:
-            "STAR --genomeDir {input.ref} "
+            "STAR --genomeDir {params.genomedir} "
             "--readFilesIn {input.forward} {input.reverse} "
             "--outFilterMultimapNmax {params.multimappers} "
             "--outFilterMismatchNmax {params.maxmismatches} "
