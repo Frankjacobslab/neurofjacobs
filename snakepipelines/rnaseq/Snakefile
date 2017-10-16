@@ -5,7 +5,7 @@
 # Tells which files to generate as specified by the rule 'all'
 
 import os
-import subprocess
+import datetime
 
 #########################
 ## Pipeline configuration
@@ -14,9 +14,12 @@ import subprocess
 # configuration file
 configfile: "config.yaml"
 
-# working directory (o clean afterwards)
+# working directory (to clean afterwards)
+# result directory (to keep) with the time when analysis started
 WORKING_DIR = config["workdir"]
-RESULT_DIR = config["resultdir"]
+now = datetime.datetime.now() # get current time
+RESULT_DIR = config["resultdir"] + str(now.year) + "-" + str(now.month) + "-" + str(now.day) + "/"
+
 
 # Number of CPU (threads)
 THREADS = config["threads"]
@@ -28,16 +31,14 @@ TRIMMOMATIC = config["trimmomatic"]["jarfile"]
 ##################
 ## Desired outputs
 ##################
-FASTQC_REPORTS = expand("fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html",sample=config["samples"],pair=["forward","reverse"])
-MAPPING_LOGS = expand(RESULT_DIR + "mappinglogs/{sample}_Log.final.out",sample=config["samples"]) 
+FASTQC_REPORTS = expand(RESULT_DIR + "fastqc/{step}/{sample}/{pair}/{sample}_{pair}_fastqc.html",step=["raw","trimmed"],sample=config["samples"],pair=["forward","reverse"])
 COUNTS = [RESULT_DIR + f for f in ["counts/gene_counts.txt","counts/repeat_counts.txt"]] 
-BIGWIGS = expand(RESULT_DIR + "bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw",sample=config["samples"],uniqueness=["Unique","UniqueMultiple"],strand=["str1","str2"])
+BIGWIGS = expand(RESULT_DIR + "mapped/{sample}_accepted_hits.sorted.bw",sample=config["samples"])
 
 MASTER_FILES = [RESULT_DIR + f for f in ["Snakefile","config.yaml","environment.yaml"]]
 
 rule all:
 	input:
-		MAPPING_LOGS,
 		COUNTS,
 		BIGWIGS,
 		MASTER_FILES 
@@ -62,11 +63,11 @@ rule copy_master_files:
 #########
 rule convert_to_bigWig: 
     input:
-        bedgraph = WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.sorted.bg",
+        bedgraph = WORKING_DIR + "mapped/{sample}_accepted_hits.sorted.bg",
         chroms = "chromSizes.tab"
     output:
-        RESULT_DIR + "bigwig/{sample}_Signal.{uniqueness}.{strand}.normalized.bw"
-    message:"converting strand-specific bedGraph files for {wildcards.sample}, {wildcards.uniqueness} reads and {wildcards.strand} strand to bigWig format"
+        RESULT_DIR + "mapped/{sample}_accepted_hits.sorted.bw"
+    message:"converting bedGraph files for {wildcards.sample} strand to bigWig format"
     shell:
         "bedGraphToBigWig {input.bedgraph} {input.chroms} {output}"        
 
@@ -80,19 +81,47 @@ rule generate_chrom_sizes:
 
 rule sort_bedgraph:
     input:
-         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.bg"
+         WORKING_DIR + "mapped/{sample}_accepted_hits.bg"
     output:
-         WORKING_DIR + "mapped/{sample}_Signal.{uniqueness}.{strand}.out.sorted.bg"
-    message:"sorting {wildcards.sample} bedGraph file for strand {wildcards.strand} and {wildcards.uniqueness} reads"
+         WORKING_DIR + "mapped/{sample}_accepted_hits.sorted.bg"
+    message:"sorting {wildcards.sample} bedGraph file"
     shell:
         "bedSort {input} {output}"   
+
+rule make_bedgraph:
+    input:
+        bam = WORKING_DIR + "mapped/{sample}_accepted_hits.sorted.bam",
+        genome = config["refseqs"]["genomefasta"]
+    output:
+        WORKING_DIR + "mapped/{sample}_accepted_hits.bg"
+    message:"computing {wildcards.sample} genome coverage values"
+    shell:
+        "samtools view -b {input.bam} | bedtools genomecov "
+        "-split " 						# split option necessary for RNA-Seq
+        "-bg "							# to report coverage in bedgraph format
+        "-ibam stdin "						# reads file directly from standard-in
+        "-g {input.genome} > {output}" 
+
+
+
+
+# To be discussed with Nina
+#rule separate_strands:
+#    input:
+#        WORKING_DIR + "mapped/{sample}_accepted_hits.bam"
+#    output:
+#        pos = WORKING_DIR + "mapped/{sample}/accepted_hits.bam",#
+#
+#    message:"split {wildcards.sample} bam file into positive and negative strands"
+#    shell:
+#        "samtools view -f 99  
 
 ################################################
 ## Count read alignments per feature (e.g. gene)
 ################################################
 rule count_repeats:
     input:
-        bams = expand(WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam",sample=config["samples"].keys()),
+        bams = expand(WORKING_DIR + "mapped/{sample}_accepted_hits.sorted.bam",sample=config["samples"].keys()),
         annotation = config["annotations"]["gtf4repeats"],
         genome = config["refseqs"]["genomefasta"]
     output:
@@ -101,7 +130,6 @@ rule count_repeats:
     shell:
         "featureCounts "
         "-f "				# summarize only at exon level
-        #"-t exon "			# specify how to count reads at feature level (e.g. exon)
         "-T {THREADS} "
         "-G {input.genome} "		# ref genome sequence
         "-a {input.annotation} "	# annotation 
@@ -111,7 +139,7 @@ rule count_repeats:
 
 rule count_genes:
     input:
-        bams = expand(WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam",sample=config["samples"].keys()),
+        bams = expand(WORKING_DIR + "mapped/{sample}_accepted_hits.sorted.bam",sample=config["samples"].keys()),
         annotation = config["annotations"]["refseqFromSubread"],
         genome = config["refseqs"]["genomefasta"]
     output:
@@ -128,128 +156,59 @@ rule count_genes:
         "-o {output} "
         "{input.bams}"               	# can process more than one BAM file at once 
         
-
-
-#############################
-# Genome alignment using STAR
-#############################
-rule copy_mapping_logs:
+#############################################
+# Reads alignment against genome using hisat2
+#############################################
+rule sort_and_rename_bams: # for count and coverage computations
     input:
-        WORKING_DIR + "mapped/{sample}_Log.final.out"
+        WORKING_DIR + "mapped/{sample}/accepted_hits.bam"
     output:
-        RESULT_DIR + "mappinglogs/{sample}_Log.final.out" 
-    message:"moving mapping log for {wildcards.sample} in {output}"
-    shell:"mv {input} {output}"
-
-rule map_to_genome_using_STAR:
-    input:
-        ref = [WORKING_DIR + "star2pass/"+f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]],
-        forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
-        reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq"
-    output:
-        WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam",
-        WORKING_DIR + "mapped/{sample}_Aligned.sortedByCoord.out.bam.bai",
-        WORKING_DIR + "mapped/{sample}_Log.final.out",
-	WORKING_DIR + "mapped/{sample}_Signal.Unique.str1.out.bg",
-        WORKING_DIR + "mapped/{sample}_Signal.Unique.str2.out.bg",
-        WORKING_DIR + "mapped/{sample}_Signal.UniqueMultiple.str1.out.bg",
-        WORKING_DIR + "mapped/{sample}_Signal.UniqueMultiple.str2.out.bg"        
-    message:"mapping the {wildcards.sample} reads to genome"
-    params:
-        prefix = WORKING_DIR + "mapped/{sample}_",
-        maxmismatches = config["star"]["mismatches"],
-        unmapped = config["star"]["unmapped"]	,
-        multimappers = config["star"]["multimappers"],
-        matchNminoverLread = config["star"]["matchminoverlengthread"],
-	outSamType = config["star"]["samtype"],
-        outWigType = config["star"]["outwigtype"],
-        outWigStrand = config["star"]["outwigstrand"],
-        outWigNorm = config["star"]["outwignorm"],
-        genomedir = WORKING_DIR + "star2pass/"
+        WORKING_DIR + "mapped/{sample}_accepted_hits.sorted.bam"
+    message:"sorting {wildcards.sample} bam file"
     shell:
-            "STAR --genomeDir {params.genomedir} "
-            "--readFilesIn {input.forward} {input.reverse} "
-            "--outFilterMultimapNmax {params.multimappers} "
-            "--outFilterMismatchNmax {params.maxmismatches} "
-            "--outFilterMatchNminOverLread {params.matchNminoverLread} "
-            "--alignEndsType EndToEnd "
-            "--runThreadN {THREADS} "
-            "--outReadsUnmapped {params.unmapped} "
-            "--outFileNamePrefix {params.prefix} "
-            "--outSAMtype {params.outSamType} "
-            "--outWigType {params.outWigType} "
-            "--outWigStrand {params.outWigStrand} "
-            "--outWigNorm {params.outWigNorm};"
-            "samtools index {output[0]}"
+        "samtools sort -l 0 " 	# 0 for uncompressed (temporary file)
+        "-m 4G "		# memory for sorting
+        "-O bam "		# output format
+        "-@ {THREADS} "		# number of threads for sorting BAM file
+        "-o {output} "		# output file
+        "{input}"
 
-#####################################################################
-## STAR 2-pass: genome indexing + splice junctions database generation 
-#####################################################################
-rule star2pass_index:
-    input:
-        sjdb = WORKING_DIR + "star1pass/SJ.concatenated.out.tab", 
-        ref= config["refseqs"]["genomefasta"],
-        gtf = config["annotations"]["gtf4genes"]
-    output:
-        STAR_2PASS = [WORKING_DIR + "star2pass/"+ f for f in ["chrLength.txt","chrNameLength.txt","chrName.txt","chrStart.txt","Genome","genomeParameters.txt","SA","SAindex"]]
-    message: "STAR 2nd pass: generating genome index"	
-    params:
-        WORKING_DIR + "star2pass/"
-    shell:
-        "STAR --runMode genomeGenerate "
-        "--genomeDir {params} "
-        "--genomeFastaFiles {input.ref} "
-        "--runThreadN {THREADS} "
-        "--sjdbFileChrStartEnd {input.sjdb} "
-        "--sjdbOverhang 99 "
-        "--sjdbGTFfile {input.gtf};"
-        "touch -h {output}"
-
-rule concatenate_sjdb:
-    input:
-        expand(WORKING_DIR + "star1pass/{sample}_SJ.out.tab",sample=config["samples"].keys()),
-    output:
-        WORKING_DIR + "star1pass/SJ.concatenated.out.tab"
-    message:"concatenating splice junctions from different samples "
-    shell:"cat {input} >> {output}"
-
-rule star1pass_align:
+rule hisat:
     input:
         forward = WORKING_DIR + "trimmed/{sample}_forward.fastq",
         reverse = WORKING_DIR + "trimmed/{sample}_reverse.fastq",
-        ref = WORKING_DIR + "star_index/"
+        index = [WORKING_DIR + "index/genome" + "." + str(n) + ".ht2" for n in range(1,9)]
     output:
-        WORKING_DIR + "star1pass/{sample}_SJ.out.tab",
-        temp(WORKING_DIR + "star1pass/{sample}_Aligned.out.sam")
-    message:"STAR 1st pass: aligning {wildcards.sample} reads to generate splice junction files"
+        WORKING_DIR + "mapped/{sample}/accepted_hits.bam"
+    message:"mapping {wildcards.sample} reads using hisat2"
     params:
-        WORKING_DIR + "star1pass/{sample}_"	
-    shell: 		
-        "STAR --runMode alignReads "
-        "--genomeDir {input.ref} "
-        "--readFilesIn {input.forward} {input.reverse} "
-        "--outFileNamePrefix {params} "
-        "--outFilterIntronMotifs RemoveNoncanonical "
-        "--runThreadN {THREADS}"
-
- # sdjbOverhang specifies the length of the genomic sequence around the annotated junction to be used in constructing the splie junctions database. Ideally this length should be equal to ReadLength-1
-rule star_genome_index:
-    input:
-        genome = config["refseqs"]["genomefasta"],
-        gtf = config["annotations"]["gtf4genes"]
-    output:
-        WORKING_DIR + "star_index/"
-    message:"generation STAR genome index" 
-    params:
-        WORKING_DIR + "star_index/"
+        libtype = config["hisat2"]["library_type"],
+        speed = config["hisat2"]["speed"],
+        min_intron = config["hisat2"]["min_intron_length"],
+        max_intron = config["hisat2"]["max_intron_length"],
+        index = WORKING_DIR + "index/genome"
+    log: 
+        RESULT_DIR + "mapped/{sample}_log.out"
     shell:
-        "mkdir -p {params};"
-        "STAR --runMode genomeGenerate "
-        "--genomeDir {params} "
-        "--genomeFastaFiles {input.genome} "
-        "--runThreadN {THREADS} "
-        "--sjdbOverhang 99 "
-        "--sjdbGTFfile {input.gtf}"
+        "hisat2 -x {params.index} "
+        "-I {params.min_intron} "
+        "-X {params.max_intron} "
+        "--threads {THREADS} "
+        "{params.libtype} " 
+        "-1 {input.forward} "
+        "-2 {input.reverse} "
+        "-S {output} 2>{log} "
+
+rule make_genome_index:
+    input:
+        genome = config["refseqs"]["genomefasta"]
+    output:
+        index = [WORKING_DIR + "index/genome" + "." + str(n) + ".ht2" for n in range(1,9)]
+    message:"building genome index with hisat2"
+    params:
+       index_base = WORKING_DIR + "index/genome"
+    shell:
+        "hisat2-build --quiet {input.genome} {params.index_base}"
 
 ################################
 ## Fastqc reports after trimming
@@ -258,7 +217,7 @@ rule fastqc_after_trimming:
     input:
         WORKING_DIR + "trimmed/{sample}_{pair}.fastq"
     output:
-        "fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html"
+        RESULT_DIR + "fastqc/trimmed/{sample}/{pair}/{sample}_{pair}_fastqc.html"
     message:"generating fastqc report for trimmed reverse {wildcards.sample} reads"
     params:
         "fastqc/trimmed/{sample}/{pair}/"
@@ -301,4 +260,17 @@ rule trimmomaticPaired:
         "SLIDINGWINDOW:{params.windowSize}:{params.avgMinQual} "
         "MINLEN:{params.minReadLen} 2>{log}"
 
-
+################################
+## Fastqc reports before trimming
+################################
+rule fastqc_before_trimming:
+    input:
+        forward = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["forward"][wildcards.pair],
+        reverse = lambda wildcards: config["fastqdir"] + config["samples"][wildcards.sample]["reverse"][wildcards.pair]
+    output:
+        RESULT_DIR + "fastqc/raw/{sample}/{pair}/{sample}_{pair}_fastqc.html"
+    message:"generating fastqc report for original untrimmed {wildcards.sample} reads"
+    params:
+        "fastqc/raw/{sample}/{pair}/"
+    shell:
+        "fastqc --threads {THREADS} --outdir={params} {input}"

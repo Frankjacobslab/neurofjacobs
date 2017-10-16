@@ -1,52 +1,28 @@
 ---
 # Number of cores to be used per program
-threads: 5
+threads: 10
 
 # directories
-fastqdir: "/home/mgalland/workspace/neurofjacobs/data/01.seqruns/20160912_dopamine_spheres/"
-workdir: "/zfs/scratch/mgalland_temp/neuro/rnaseq/" # to be cleaned-up after pipeline run
-resultdir: "../../results/rnaseq/" # change to desired location of outputs
+fastqdir: "/zfs/scratch/fjacobs_temp/"
+workdir: "scratch/" # to be cleaned-up after pipeline run
+resultdir: "results/" # change to desired location of outputs
 
 # Reference sequences and annotations
 refseqs:
   genome2bit: '../../data/02.refs/hg19.2bit'
-  genomefasta: '../../data/02.refs/hg19.genome.fa'
+  genomefasta: '../../data/02.refs/hg19.genome.fasta'
   chromSizes: 'http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes'
   repeatsfasta: '../../data/02.refs/repeats.parsed.fasta'
 annotations:
   gtf4genes: '../../data/02.refs/knownGenes.gtf'
   gtf4repeats: '../../data/02.refs/repeats.gtf'
-  refseqFromSubread: '../../data/02.refs/hg19_RefSeq_exon.txt'
+  refseqFromSubread: '../../data/02.refs/hg19_RefSeq_exon.txt' # RefSeq SAF annotation file used for counting reads
 
 # Sample list
 samples:
-  mDA_D0_1:
-    forward: huESC_fj74_R1.fastq
-    reverse: huESC_fj74_R2.fastq
-  mDA_D0_2:
-    forward: fj95_TGACCA_R1.fastq
-    reverse: fj95_TGACCA_R2.fastq
-  mDA_D0_3:
-    forward: fj96_ACAGTG_R1.fastq
-    reverse: fj96_ACAGTG_R2.fastq
-  mDA_D28_1:
-    forward: C9JBWANXX_102867-001-001_GTCCTAAG_L008_R1.fastq
-    reverse: C9JBWANXX_102867-001-001_GTCCTAAG_L008_R2.fastq
-  mDA_D28_2:
-    forward: C9JBWANXX_102867-001-002_GCGTTAGA_L008_R1.fastq 
-    reverse: C9JBWANXX_102867-001-002_GCGTTAGA_L008_R2.fastq
-  mDA_D28_3:
-    forward: C9JBWANXX_102867-001-003_CAAGGTAC_L008_R1.fastq
-    reverse: C9JBWANXX_102867-001-003_CAAGGTAC_L008_R2.fastq
-  mDA_D42_1:
-    forward: C9JBWANXX_102867-001-004_AGACCTTG_L008_R1.fastq
-    reverse: C9JBWANXX_102867-001-004_AGACCTTG_L008_R2.fastq
-  mDA_D42_2:
-    forward: C9JBWANXX_102867-001-005_GTCGTTAC_L008_R1.fastq
-    reverse: C9JBWANXX_102867-001-005_GTCGTTAC_L008_R2.fastq
-  mDA_D42_3:
-    forward: C9JBWANXX_102867-001-006_GTAACCGA_L008_R1.fastq
-    reverse: C9JBWANXX_102867-001-006_GTAACCGA_L008_R2.fastq
+  hEBw4_fj107:
+    forward: hEBw4_fj107_L1_2.fastq.gz
+    reverse: hEBw4_fj107_L1_1.fastq.gz
 
 # Parameters for various executables
 trimmomatic:
@@ -63,28 +39,11 @@ trimmomatic:
   # phred for illumina >1.8 the quality score are encoded by phred33
   phred: "-phred33"
 
-fastqc:
-  executable: '../../scr/FastQC/fastqc'
-
-star:
-  # type of output
-  samtype: 'BAM SortedByCoordinate'
-  # wig type
-  outwigtype: 'bedGraph'  
-  # strandness of wig file
-  outwigstrand: 'Stranded' 
-  # normalization method for wig file (None or RPM = reads per million). 
-  # RPM = read raw count / total number of uniquely mapping reads *10⁶  (for ".Unique." signal files)
-  # RPM = read raw count / total number of unique and multiple mapping reads (for ".UniqueMultiple." signal files)
-  # These RPM normalizations are used by the ENCODE consortium. 
-  outwignorm: 'RPM'
-  # alignment will be output only if it has less mismatches than this number
-  mismatches: '2'
-  # unmapped accepted values are None or Fastx (to output fastq files of unmapped reads)
-  unmapped: 'None' 
-  # maximum number of loci the read is allowed to map to
-  multimappers: '10'
-  # alignment will be output if percentage of read length is higher than this value (66% of 2x100bp = 132 nucleotides)
-  matchminoverlengthread: '0.66'
-  # extract
+# HISAT2
+hisat2:
+  read_mismatches: "2"
+  min_intron_length: "70"
+  max_intron_length: "10000"
+  library_type: "--fr" # Default: --fr (appropriate for Illumina's Paired-end Sequencing Assay).
+  speed: "--b2-very-sensitive"
   
